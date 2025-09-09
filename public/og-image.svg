@@ -1,0 +1,53 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8F4FD;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FEF3E2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Floating shapes -->
+  <circle cx="200" cy="150" r="60" fill="#E0E7FF" opacity="0.6"/>
+  <circle cx="1000" cy="200" r="80" fill="#FDE68A" opacity="0.4"/>
+  <circle cx="150" cy="450" r="40" fill="#FECACA" opacity="0.5"/>
+  <circle cx="1050" cy="480" r="50" fill="#D1FAE5" opacity="0.6"/>
+  
+  <!-- Logo/Icon -->
+  <g transform="translate(500, 200)">
+    <!-- Outer ring -->
+    <circle cx="100" cy="50" r="50" fill="white" opacity="0.9"/>
+    <!-- Inner circles -->
+    <circle cx="100" cy="30" r="8" fill="#3B82F6"/>
+    <circle cx="100" cy="70" r="6" fill="#FBBF24"/>
+    <circle cx="80" cy="50" r="6" fill="#EC4899"/>
+    <circle cx="120" cy="50" r="6" fill="#10B981"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="320" font-family="Arial, sans-serif" font-size="64" font-weight="bold" text-anchor="middle" fill="#1F2937">
+    Emotional Shower
+  </text>
+  
+  <!-- Korean subtitle -->
+  <text x="600" y="380" font-family="Arial, sans-serif" font-size="32" text-anchor="middle" fill="#6B7280">
+    정서샤워 - 매일 하는 마음 샤워
+  </text>
+  
+  <!-- Description -->
+  <text x="600" y="440" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" fill="#9CA3AF">
+    하루 3번, 간단한 감정 체크인으로 마음 건강을 챙기세요
+  </text>
+  
+  <!-- Bottom accent -->
+  <rect x="0" y="580" width="1200" height="50" fill="url(#logoGradient)" opacity="0.1"/>
+</svg>
