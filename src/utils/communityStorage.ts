@@ -203,3 +203,108 @@ export const getTotalPostsCount = (roomId: string): number => {
   const posts = loadPosts(roomId);
   return posts.length;
 };
+
+// 모든 게시글 가져오기 (통합 피드용)
+export const loadAllPosts = (): Post[] => {
+  try {
+    const allPosts: Post[] = [];
+
+    // 로컬스토리지에서 모든 community_posts_* 키 찾기
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('community_posts_')) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const posts: Post[] = JSON.parse(stored);
+          allPosts.push(...posts);
+        }
+      }
+    }
+
+    // 시간순 정렬 (최신순)
+    allPosts.sort((a, b) => b.timestamp - a.timestamp);
+
+    // 시간 정보 업데이트
+    return allPosts.map(post => ({
+      ...post,
+      time: formatTimeAgo(post.timestamp),
+      comments: post.comments.map(comment => ({
+        ...comment,
+        time: formatTimeAgo(comment.timestamp)
+      }))
+    }));
+  } catch (error) {
+    console.error('Failed to load all posts:', error);
+    return [];
+  }
+};
+
+// 기수 통계 데이터 생성 (가상 데이터)
+export interface CohortStats {
+  totalUsers: number;
+  todayCompleted: number;
+  todayCompletionRate: number;
+  eligibleFor22Days: number;
+  averageStamps: number;
+  topUsers: Array<{
+    rank: number;
+    name: string;
+    stamps: number;
+    avatar: string;
+  }>;
+}
+
+export const generateCohortStats = (cohortId: string, userStamps: number): CohortStats => {
+  // 시드값으로 일관된 랜덤 데이터 생성
+  const seed = cohortId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const random = (min: number, max: number, offset: number = 0) => {
+    const x = Math.sin(seed + offset) * 10000;
+    return Math.floor(min + (x - Math.floor(x)) * (max - min + 1));
+  };
+
+  const totalUsers = random(80, 150, 1);
+  const todayCompleted = random(Math.floor(totalUsers * 0.5), Math.floor(totalUsers * 0.85), 2);
+  const eligibleFor22Days = random(Math.floor(totalUsers * 0.6), Math.floor(totalUsers * 0.9), 3);
+  const averageStamps = random(10, 20, 4) + Math.random();
+
+  // TOP 5 랭킹 생성 (사용자 포함)
+  const topUsers = [];
+  const userRank = random(1, 8, 5); // 사용자 랭킹 (1-8위 사이)
+
+  for (let i = 1; i <= 5; i++) {
+    if (i === userRank && userRank <= 5) {
+      // 사용자를 랭킹에 포함
+      topUsers.push({
+        rank: i,
+        name: '나',
+        stamps: userStamps,
+        avatar: '⭐'
+      });
+    } else {
+      // 다른 사용자
+      topUsers.push({
+        rank: i,
+        name: generateAnonymousName(),
+        stamps: random(userStamps - 3, userStamps + 5, i + 10),
+        avatar: getRandomAvatar()
+      });
+    }
+  }
+
+  // 스탬프 수로 정렬
+  topUsers.sort((a, b) => b.stamps - a.stamps);
+
+  // 랭킹 재할당
+  topUsers.forEach((user, index) => {
+    user.rank = index + 1;
+  });
+
+  return {
+    totalUsers,
+    todayCompleted,
+    todayCompletionRate: Math.round((todayCompleted / totalUsers) * 100),
+    eligibleFor22Days,
+    averageStamps: Math.round(averageStamps * 10) / 10,
+    topUsers
+  };
+};

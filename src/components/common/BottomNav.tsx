@@ -1,12 +1,12 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, MessageCircle, Users, Clock, User } from 'lucide-react';
+import { Home, Users, User, Heart, CalendarCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Updated navigation items for 30-day challenge
 const navItems = [
   { path: '/home', icon: Home, label: '홈' },
-  { path: '/chat', icon: MessageCircle, label: '채팅' },
+  { path: '/daily-record', icon: CalendarCheck, label: '오늘기록' },
   { path: '/community', icon: Users, label: '커뮤니티' },
-  { path: '/history', icon: Clock, label: '기록' },
   { path: '/profile', icon: User, label: '프로필' },
 ];
 
