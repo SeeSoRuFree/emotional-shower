@@ -20,6 +20,12 @@ import Signup from '@/pages/Signup';
 import Login from '@/pages/Login';
 import Apply from '@/pages/Apply';
 import Admin from '@/pages/Admin';
+import Onboarding from '@/pages/Onboarding';
+
+// Error pages
+import NotFound from '@/pages/NotFound';
+import Unauthorized from '@/pages/Unauthorized';
+import Waiting from '@/pages/Waiting';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -73,17 +79,25 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/onboarding" element={isLoggedIn ? <Onboarding /> : <Navigate to="/unauthorized" />} />
+
+          {/* Error/Info pages */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/waiting" element={<Waiting />} />
 
           {/* Protected routes - require login */}
-          <Route path="/home" element={isLoggedIn ? <Home /> : <Navigate to="/login" />} />
-          <Route path="/pre-survey" element={isLoggedIn ? <PreSurvey /> : <Navigate to="/login" />} />
-          <Route path="/daily-record" element={isLoggedIn ? <DailyRecord /> : <Navigate to="/login" />} />
-          <Route path="/post-survey" element={isLoggedIn ? <PostSurvey /> : <Navigate to="/login" />} />
-          <Route path="/report" element={isLoggedIn ? <Report /> : <Navigate to="/login" />} />
-          <Route path="/community" element={isLoggedIn ? <Community /> : <Navigate to="/login" />} />
-          <Route path="/community/:roomId" element={isLoggedIn ? <Community /> : <Navigate to="/login" />} />
-          <Route path="/community/:roomId/:postId" element={isLoggedIn ? <PostDetail /> : <Navigate to="/login" />} />
-          <Route path="/profile" element={isLoggedIn ? <Profile /> : <Navigate to="/login" />} />
+          <Route path="/home" element={isLoggedIn ? <Home /> : <Navigate to="/unauthorized" />} />
+          <Route path="/pre-survey" element={isLoggedIn ? <PreSurvey /> : <Navigate to="/unauthorized" />} />
+          <Route path="/daily-record" element={isLoggedIn ? <DailyRecord /> : <Navigate to="/unauthorized" />} />
+          <Route path="/post-survey" element={isLoggedIn ? <PostSurvey /> : <Navigate to="/unauthorized" />} />
+          <Route path="/report" element={isLoggedIn ? <Report /> : <Navigate to="/unauthorized" />} />
+          <Route path="/community" element={isLoggedIn ? <Community /> : <Navigate to="/unauthorized" />} />
+          <Route path="/community/:roomId" element={isLoggedIn ? <Community /> : <Navigate to="/unauthorized" />} />
+          <Route path="/community/:roomId/:postId" element={isLoggedIn ? <PostDetail /> : <Navigate to="/unauthorized" />} />
+          <Route path="/profile" element={isLoggedIn ? <Profile /> : <Navigate to="/unauthorized" />} />
+
+          {/* 404 - Catch all */}
+          <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         <Toaster />

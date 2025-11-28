@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, CheckCircle, XCircle, Clock, Copy, Check, Plus, Calendar, Users as UsersIcon, Edit, Trash } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Clock, Copy, Check, Plus, Calendar, Users as UsersIcon, Edit, Trash, Search, BarChart3, TrendingUp, Award } from 'lucide-react';
 import SkyBackground from '@/components/cloud/SkyBackground';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useCohortStore } from '@/store/cohortStore';
+import { useAuthStore } from '@/store/authStore';
+import { useChallengeStore } from '@/store/challengeStore';
+import { loadAllPosts } from '@/utils/communityStorage';
 import type { Application } from '@/store/applicationStore';
 import type { Cohort } from '@/store/cohortStore';
 
-type Tab = 'cohorts' | 'pending' | 'approved' | 'rejected';
+type Tab = 'cohorts' | 'users' | 'stats' | 'pending' | 'approved' | 'rejected';
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>('cohorts');
@@ -15,6 +18,8 @@ export default function Admin() {
   const [showCohortForm, setShowCohortForm] = useState(false);
   const [selectedCohortForApproval, setSelectedCohortForApproval] = useState<string | null>(null);
   const [approvingApplicationId, setApprovingApplicationId] = useState<string | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [selectedCohortFilter, setSelectedCohortFilter] = useState<string>('all');
 
   const [cohortForm, setCohortForm] = useState({
     name: '',
@@ -25,6 +30,132 @@ export default function Admin() {
 
   const { applications, approveApplication, rejectApplication } = useApplicationStore();
   const { cohorts, createCohort, deleteCohort, updateCohortStatus } = useCohortStore();
+
+  // authStore에서 모든 사용자 불러오기
+  const loadUsers = () => {
+    try {
+      const stored = localStorage.getItem('kindness-users');
+      if (stored) {
+        return JSON.parse(stored).map((user: any) => ({
+          ...user,
+          createdAt: new Date(user.createdAt),
+          cohortHistory: user.cohortHistory?.map((ch: any) => ({
+            ...ch,
+            joinedAt: new Date(ch.joinedAt),
+            completedAt: ch.completedAt ? new Date(ch.completedAt) : null
+          })) || []
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+    return [];
+  };
+
+  const loadChallenges = () => {
+    try {
+      const stored = localStorage.getItem('kindness-daily-records');
+      if (stored) {
+        return JSON.parse(stored).map((challenge: any) => ({
+          ...challenge,
+          appliedAt: challenge.appliedAt ? new Date(challenge.appliedAt) : null,
+          approvedAt: challenge.approvedAt ? new Date(challenge.approvedAt) : null,
+          startedAt: challenge.startedAt ? new Date(challenge.startedAt) : null,
+          completedAt: challenge.completedAt ? new Date(challenge.completedAt) : null
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load challenges:', error);
+    }
+    return [];
+  };
+
+  const allUsers = useMemo(() => loadUsers(), [activeTab]);
+  const allChallenges = useMemo(() => loadChallenges(), [activeTab]);
+
+  // 사용자별 챌린지 정보 매핑
+  const usersWithChallenges = useMemo(() => {
+    return allUsers.map(user => {
+      const userChallenges = allChallenges.filter((c: any) => c.cohortId === user.currentCohortId);
+      const currentChallenge = userChallenges.length > 0 ? userChallenges[0] : null;
+
+      return {
+        ...user,
+        challenge: currentChallenge,
+        currentDay: currentChallenge ? Math.min(currentChallenge.completedDays.length + 1, 30) : 0,
+        stampsCount: currentChallenge ? currentChallenge.completedDays.length : 0
+      };
+    });
+  }, [allUsers, allChallenges]);
+
+  // 필터링 및 검색
+  const filteredUsers = useMemo(() => {
+    let filtered = usersWithChallenges;
+
+    // 기수 필터
+    if (selectedCohortFilter !== 'all') {
+      filtered = filtered.filter(u => u.currentCohortId === selectedCohortFilter);
+    }
+
+    // 검색 필터
+    if (userSearchQuery) {
+      const query = userSearchQuery.toLowerCase();
+      filtered = filtered.filter(u =>
+        u.name.toLowerCase().includes(query) ||
+        u.email.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [usersWithChallenges, selectedCohortFilter, userSearchQuery]);
+
+  // 통계 계산
+  const stats = useMemo(() => {
+    const allPosts = loadAllPosts();
+
+    const cohortStats = cohorts.map(cohort => {
+      const cohortUsers = allUsers.filter(u => u.currentCohortId === cohort.id);
+      const cohortChallenges = allChallenges.filter((c: any) => c.cohortId === cohort.id);
+
+      const completedCount = cohortChallenges.filter((c: any) => c.status === 'completed').length;
+      const totalCount = cohortChallenges.length || 1;
+      const completionRate = Math.round((completedCount / totalCount) * 100);
+
+      const averageStamps = cohortChallenges.length > 0
+        ? cohortChallenges.reduce((sum: number, c: any) => sum + (c.completedDays?.length || 0), 0) / cohortChallenges.length
+        : 0;
+
+      return {
+        cohortId: cohort.id,
+        cohortName: cohort.name,
+        userCount: cohortUsers.length,
+        completionRate,
+        averageStamps: Math.round(averageStamps * 10) / 10
+      };
+    });
+
+    // TOP 사용자
+    const topUsers = [...usersWithChallenges]
+      .sort((a, b) => b.stampsCount - a.stampsCount)
+      .slice(0, 10)
+      .map((user, index) => ({
+        rank: index + 1,
+        name: user.name,
+        email: user.email,
+        stamps: user.stampsCount,
+        cohort: cohorts.find(c => c.id === user.currentCohortId)?.name || '-'
+      }));
+
+    return {
+      totalUsers: allUsers.length,
+      activeChallenges: allChallenges.filter((c: any) => c.status === 'active').length,
+      completedChallenges: allChallenges.filter((c: any) => c.status === 'completed').length,
+      totalPosts: allPosts.length,
+      totalComments: allPosts.reduce((sum, post) => sum + post.comments.length, 0),
+      cohortStats,
+      topUsers
+    };
+  }, [cohorts, allUsers, allChallenges, activeTab]);
 
   const filteredApplications = applications.filter(app => app.status === activeTab);
 
@@ -181,7 +312,7 @@ export default function Admin() {
 
           {/* Tabs */}
           <div className="flex gap-2 mb-6 bg-white/80 backdrop-blur rounded-2xl p-2 shadow-soft overflow-x-auto">
-            {(['cohorts', 'pending', 'approved', 'rejected'] as const).map((tab) => (
+            {(['cohorts', 'users', 'stats', 'pending', 'approved', 'rejected'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -192,6 +323,8 @@ export default function Admin() {
                 }`}
               >
                 {tab === 'cohorts' && '기수 관리'}
+                {tab === 'users' && '사용자 관리'}
+                {tab === 'stats' && '통계'}
                 {tab === 'pending' && '대기 중'}
                 {tab === 'approved' && '승인됨'}
                 {tab === 'rejected' && '거절됨'}
@@ -345,8 +478,275 @@ export default function Admin() {
             </div>
           )}
 
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="space-y-4">
+              {/* 검색 및 필터 */}
+              <div className="bg-white/80 backdrop-blur rounded-2xl p-4 shadow-soft">
+                <div className="flex flex-col md:flex-row gap-3">
+                  {/* 검색 */}
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-headspace-textMuted" />
+                    <input
+                      type="text"
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      placeholder="이름 또는 이메일로 검색..."
+                      className="w-full pl-10 pr-4 py-2 border-2 border-headspace-pastel-blue focus:border-headspace-blue rounded-xl focus:outline-none"
+                    />
+                  </div>
+
+                  {/* 기수 필터 */}
+                  <select
+                    value={selectedCohortFilter}
+                    onChange={(e) => setSelectedCohortFilter(e.target.value)}
+                    className="px-4 py-2 border-2 border-headspace-pastel-blue focus:border-headspace-blue rounded-xl focus:outline-none"
+                  >
+                    <option value="all">전체 기수</option>
+                    {cohorts.map(cohort => (
+                      <option key={cohort.id} value={cohort.id}>
+                        {cohort.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-3 text-sm text-headspace-textMuted">
+                  총 {filteredUsers.length}명의 사용자
+                </div>
+              </div>
+
+              {/* 사용자 목록 */}
+              {filteredUsers.length === 0 ? (
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-8 text-center shadow-soft">
+                  <UsersIcon className="w-12 h-12 text-headspace-textMuted mx-auto mb-3" />
+                  <p className="text-headspace-textMuted">사용자가 없습니다</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredUsers.map((user) => (
+                    <motion.div
+                      key={user.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/80 backdrop-blur rounded-2xl p-5 shadow-soft"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-bold text-headspace-darkGray text-lg">
+                            {user.name}
+                          </h3>
+                          <p className="text-sm text-headspace-textMuted">{user.email}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-headspace-textMuted">기수</div>
+                          <div className="font-semibold text-headspace-darkGray">
+                            {cohorts.find(c => c.id === user.currentCohortId)?.name || '-'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 챌린지 진행 상황 */}
+                      {user.challenge && (
+                        <div className="bg-headspace-pastel-blue/20 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-headspace-darkGray">
+                              챌린지 진행 상황
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              user.challenge.status === 'active' ? 'bg-green-100 text-green-700' :
+                              user.challenge.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {user.challenge.status === 'active' ? '진행 중' :
+                               user.challenge.status === 'completed' ? '완료' :
+                               user.challenge.status === 'waiting' ? '대기' :
+                               user.challenge.status === 'approved' ? '승인됨' : '실패'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div>
+                              <div className="text-2xl font-bold text-headspace-blue">
+                                {user.currentDay}
+                              </div>
+                              <div className="text-xs text-headspace-textMuted">현재 DAY</div>
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold text-headspace-yellow">
+                                {user.stampsCount}
+                              </div>
+                              <div className="text-xs text-headspace-textMuted">스탬프</div>
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold text-headspace-green">
+                                {Math.round((user.stampsCount / 30) * 100)}%
+                              </div>
+                              <div className="text-xs text-headspace-textMuted">진행률</div>
+                            </div>
+                          </div>
+
+                          {/* 프로그레스 바 */}
+                          <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-headspace-blue to-headspace-purple h-2 rounded-full transition-all"
+                              style={{ width: `${(user.stampsCount / 30) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {!user.challenge && (
+                        <div className="bg-gray-50 rounded-xl p-3 text-center">
+                          <p className="text-sm text-headspace-textMuted">
+                            아직 챌린지를 시작하지 않았습니다
+                          </p>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Stats Tab */}
+          {activeTab === 'stats' && (
+            <div className="space-y-6">
+              {/* 전체 통계 카드 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-4 text-center shadow-soft">
+                  <UsersIcon className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-blue-600">{stats.totalUsers}</div>
+                  <div className="text-xs text-headspace-textMuted">총 사용자</div>
+                </div>
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-4 text-center shadow-soft">
+                  <TrendingUp className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-green-600">{stats.activeChallenges}</div>
+                  <div className="text-xs text-headspace-textMuted">진행 중</div>
+                </div>
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-4 text-center shadow-soft">
+                  <CheckCircle className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-purple-600">{stats.completedChallenges}</div>
+                  <div className="text-xs text-headspace-textMuted">완료</div>
+                </div>
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-4 text-center shadow-soft">
+                  <BarChart3 className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-orange-600">{stats.totalPosts}</div>
+                  <div className="text-xs text-headspace-textMuted">총 게시글</div>
+                </div>
+              </div>
+
+              {/* 기수별 통계 */}
+              <div className="bg-white/80 backdrop-blur rounded-2xl p-6 shadow-soft">
+                <h3 className="font-bold text-headspace-darkGray mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-headspace-blue" />
+                  기수별 통계
+                </h3>
+
+                <div className="space-y-4">
+                  {stats.cohortStats.map((cohortStat) => (
+                    <div key={cohortStat.cohortId} className="border-b border-gray-100 pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-headspace-darkGray">
+                          {cohortStat.cohortName}
+                        </h4>
+                        <span className="text-sm text-headspace-textMuted">
+                          {cohortStat.userCount}명 참여
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-headspace-pastel-blue/30 rounded-lg p-3">
+                          <div className="text-xs text-headspace-textMuted mb-1">완료율</div>
+                          <div className="text-xl font-bold text-headspace-blue">
+                            {cohortStat.completionRate}%
+                          </div>
+                        </div>
+                        <div className="bg-headspace-pastel-yellow/30 rounded-lg p-3">
+                          <div className="text-xs text-headspace-textMuted mb-1">평균 스탬프</div>
+                          <div className="text-xl font-bold text-headspace-yellow">
+                            {cohortStat.averageStamps}개
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* TOP 10 사용자 */}
+              <div className="bg-white/80 backdrop-blur rounded-2xl p-6 shadow-soft">
+                <h3 className="font-bold text-headspace-darkGray mb-4 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-headspace-purple" />
+                  TOP 10 사용자 (스탬프 수)
+                </h3>
+
+                <div className="space-y-2">
+                  {stats.topUsers.map((user) => (
+                    <div
+                      key={user.rank}
+                      className={`flex items-center justify-between p-3 rounded-xl ${
+                        user.rank === 1 ? 'bg-gradient-to-r from-yellow-100 to-yellow-200' :
+                        user.rank === 2 ? 'bg-gradient-to-r from-gray-100 to-gray-200' :
+                        user.rank === 3 ? 'bg-gradient-to-r from-orange-100 to-orange-200' :
+                        'bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                          user.rank === 1 ? 'bg-yellow-500 text-white' :
+                          user.rank === 2 ? 'bg-gray-400 text-white' :
+                          user.rank === 3 ? 'bg-orange-500 text-white' :
+                          'bg-gray-300 text-gray-700'
+                        }`}>
+                          {user.rank}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-headspace-darkGray">{user.name}</div>
+                          <div className="text-xs text-headspace-textMuted">{user.cohort}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-bold text-headspace-purple">
+                          {user.stamps}
+                        </div>
+                        <div className="text-xs text-headspace-textMuted">스탬프</div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {stats.topUsers.length === 0 && (
+                    <div className="text-center py-8 text-headspace-textMuted">
+                      아직 데이터가 없습니다
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 커뮤니티 통계 */}
+              <div className="bg-white/80 backdrop-blur rounded-2xl p-6 shadow-soft">
+                <h3 className="font-bold text-headspace-darkGray mb-4">커뮤니티 활동</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-headspace-pastel-pink/30 rounded-xl p-4 text-center">
+                    <div className="text-3xl font-bold text-headspace-pink mb-1">
+                      {stats.totalPosts}
+                    </div>
+                    <div className="text-sm text-headspace-textMuted">총 게시글</div>
+                  </div>
+                  <div className="bg-headspace-pastel-purple/30 rounded-xl p-4 text-center">
+                    <div className="text-3xl font-bold text-headspace-purple mb-1">
+                      {stats.totalComments}
+                    </div>
+                    <div className="text-sm text-headspace-textMuted">총 댓글</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Applications List */}
-          {activeTab !== 'cohorts' && (
+          {(activeTab === 'pending' || activeTab === 'approved' || activeTab === 'rejected') && (
             <div className="space-y-4">
               <AnimatePresence mode="popLayout">
                 {filteredApplications.length === 0 ? (

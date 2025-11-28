@@ -188,10 +188,37 @@ export default function Profile() {
       </div>
 
       <div className="px-6 py-6 pb-32 space-y-6">
+        {/* Account Info Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl p-6 shadow-soft"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-headspace-blue to-headspace-purple flex items-center justify-center text-white text-2xl font-bold">
+              {currentUser?.name.charAt(0) || '?'}
+            </div>
+            <div className="flex-1">
+              <h2 className="font-bold text-headspace-darkGray text-lg">{currentUser?.name}</h2>
+              <p className="text-sm text-headspace-textMuted">{currentUser?.email}</p>
+            </div>
+          </div>
+
+          <div className="bg-headspace-pastel-blue/30 rounded-2xl p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-headspace-darkGray">참여 기수</span>
+              <span className="text-sm font-bold text-headspace-blue">
+                {currentCohort?.name || '-'}
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Challenge Progress Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
           className="bg-gradient-to-br from-headspace-blue to-headspace-purple rounded-3xl p-6 shadow-soft-lg text-white"
         >
           <div className="flex items-center justify-between mb-4">
@@ -230,12 +257,79 @@ export default function Profile() {
           </div>
         </motion.div>
 
+        {/* Challenge History */}
+        {currentUser && currentUser.cohortHistory.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-3xl p-6 shadow-soft"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <Calendar className="w-5 h-5 text-headspace-purple" />
+              <h3 className="font-bold text-headspace-darkGray">챌린지 히스토리</h3>
+            </div>
+
+            <div className="space-y-3">
+              {currentUser.cohortHistory.map((history) => {
+                const cohort = history.cohortId ? getCohortById(history.cohortId) : null;
+                const challenge = history.cohortId ? getCurrentChallenge(history.cohortId) : undefined;
+                const stampsCount = challenge?.completedDays.length || 0;
+                const completionRate = Math.round((stampsCount / 30) * 100);
+
+                return (
+                  <div
+                    key={history.cohortId}
+                    className={`p-4 rounded-2xl border-2 ${
+                      history.status === 'completed' ? 'bg-green-50 border-green-200' :
+                      history.status === 'active' ? 'bg-blue-50 border-blue-200' :
+                      'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-headspace-darkGray">
+                        {cohort?.name || history.cohortId}
+                      </h4>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        history.status === 'completed' ? 'bg-green-200 text-green-800' :
+                        history.status === 'active' ? 'bg-blue-200 text-blue-800' :
+                        'bg-gray-200 text-gray-800'
+                      }`}>
+                        {history.status === 'completed' ? '완료' :
+                         history.status === 'active' ? '진행 중' :
+                         '실패'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-white rounded-lg p-2">
+                        <div className="text-lg font-bold text-headspace-blue">{stampsCount}</div>
+                        <div className="text-xs text-headspace-textMuted">스탬프</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-2">
+                        <div className="text-lg font-bold text-headspace-purple">{completionRate}%</div>
+                        <div className="text-xs text-headspace-textMuted">진행률</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-2">
+                        <div className="text-lg font-bold text-headspace-green">
+                          {history.status === 'completed' && stampsCount >= 22 ? '✓' : '-'}
+                        </div>
+                        <div className="text-xs text-headspace-textMuted">리포트</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.3 }}
             className="bg-white rounded-3xl p-5 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-2">
@@ -251,7 +345,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.4 }}
             className="bg-white rounded-3xl p-5 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-2">
@@ -267,7 +361,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.5 }}
             className="bg-white rounded-3xl p-5 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-2">
@@ -285,7 +379,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.6 }}
             className="bg-white rounded-3xl p-5 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-2">
@@ -306,7 +400,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.7 }}
             className="bg-white rounded-3xl p-6 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -331,7 +425,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.8 }}
             className="bg-white rounded-3xl p-6 shadow-soft"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -357,7 +451,7 @@ export default function Profile() {
           <motion.button
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: 0.9 }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate('/report')}
@@ -383,7 +477,7 @@ export default function Profile() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 1.0 }}
             className="bg-gradient-to-r from-headspace-pastel-blue to-headspace-pastel-purple rounded-3xl p-6 shadow-soft"
           >
             <div className="flex items-start gap-3">
