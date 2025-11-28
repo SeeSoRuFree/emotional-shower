@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit, Trash2, Calendar, Users, X } from 'lucide-react';
-import { useCohortStore, Cohort } from '@/store/cohortStore';
+import { useCohortStore } from '@/store/cohortStore';
+import type { Cohort } from '@/store/cohortStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CohortManagement() {
