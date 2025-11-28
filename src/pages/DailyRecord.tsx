@@ -10,6 +10,7 @@ import SkyBackground from '@/components/cloud/SkyBackground';
 import { useChallengeStore } from '@/store/challengeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useDailyRecordStore } from '@/store/dailyRecordStore';
+import { useCohortStore } from '@/store/cohortStore';
 import type { Action } from '@/store/dailyRecordStore';
 import { SELF_CARE_EXAMPLES, KINDNESS_EXAMPLES, getRandomQuote } from '@/utils/quotes';
 
@@ -22,6 +23,7 @@ export default function DailyRecord() {
   const cohortId = currentUser?.currentCohortId;
 
   const { getCurrentChallenge, calculateCurrentDay, completeDay } = useChallengeStore();
+  const { getCohortById } = useCohortStore();
   const {
     getTodayRecord,
     addSelfCareAction,
@@ -33,10 +35,19 @@ export default function DailyRecord() {
   } = useDailyRecordStore();
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+  const currentCohort = cohortId ? getCohortById(cohortId) : undefined;
+  const recordType = currentCohort?.recordType || 'both';
+
+  // Determine initial step based on recordType
+  const getInitialStep = (): Step => {
+    if (recordType === 'self_care_only') return 'selfCare';
+    if (recordType === 'kindness_only') return 'kindness';
+    return 'selfCare'; // both
+  };
 
   const [currentDay, setCurrentDay] = useState(0);
   const [completedDayNumber, setCompletedDayNumber] = useState(0);
-  const [step, setStep] = useState<Step>('selfCare');
+  const [step, setStep] = useState<Step>(getInitialStep());
   const [selectedQuote, setSelectedQuote] = useState('');
 
   // Memo modal state
@@ -99,7 +110,16 @@ export default function DailyRecord() {
         alert('자기돌봄 행동을 최소 1개 이상 추가해주세요.');
         return;
       }
-      setStep('kindness');
+
+      // Determine next step based on recordType
+      if (recordType === 'both') {
+        setStep('kindness');
+      } else {
+        // self_care_only: skip kindness, go to quote
+        const quote = getRandomQuote();
+        setSelectedQuote(quote);
+        setStep('quote');
+      }
     } else if (step === 'kindness') {
       if (kindnessActions.length === 0) {
         alert('타인친절 행동을 최소 1개 이상 추가해주세요.');
@@ -136,16 +156,31 @@ export default function DailyRecord() {
   };
 
   const getStepProgress = () => {
-    switch (step) {
-      case 'selfCare':
-        return 33;
-      case 'kindness':
-        return 66;
-      case 'quote':
-      case 'completed':
-        return 100;
-      default:
-        return 0;
+    if (recordType === 'both') {
+      // both: 3 steps total (selfCare -> kindness -> quote)
+      switch (step) {
+        case 'selfCare':
+          return 33;
+        case 'kindness':
+          return 66;
+        case 'quote':
+        case 'completed':
+          return 100;
+        default:
+          return 0;
+      }
+    } else {
+      // single type: 2 steps total (single action -> quote)
+      switch (step) {
+        case 'selfCare':
+        case 'kindness':
+          return 50;
+        case 'quote':
+        case 'completed':
+          return 100;
+        default:
+          return 0;
+      }
     }
   };
 

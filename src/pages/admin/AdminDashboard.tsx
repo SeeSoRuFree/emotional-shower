@@ -179,6 +179,7 @@ export default function AdminDashboard() {
               <tr className="border-b border-slate-200">
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">기수명</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">상태</th>
+                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">기록 항목</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">참여자</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">시작일</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">종료일</th>
@@ -199,6 +200,14 @@ export default function AdminDashboard() {
                         {cohort.status === 'active' ? '진행 중' :
                          cohort.status === 'recruiting' ? '모집 중' :
                          '종료'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                        {cohort.recordType === 'both' ? '둘다' :
+                         cohort.recordType === 'self_care_only' ? '자기돌봄' :
+                         cohort.recordType === 'kindness_only' ? '타인친절' :
+                         '둘다'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600">{cohortUsers.length}명</td>

@@ -15,7 +15,8 @@ export default function CohortManagement() {
     endDate: '',
     status: 'recruiting' as Cohort['status'],
     description: '',
-    maxParticipants: ''
+    maxParticipants: '',
+    recordType: 'both' as 'both' | 'self_care_only' | 'kindness_only'
   });
 
   // Load user counts for each cohort
@@ -41,7 +42,8 @@ export default function CohortManagement() {
         endDate: cohort.endDate.toISOString().split('T')[0],
         status: cohort.status,
         description: cohort.description || '',
-        maxParticipants: cohort.maxParticipants?.toString() || ''
+        maxParticipants: cohort.maxParticipants?.toString() || '',
+        recordType: cohort.recordType || 'both'
       });
     } else {
       setEditingCohort(null);
@@ -51,7 +53,8 @@ export default function CohortManagement() {
         endDate: '',
         status: 'recruiting',
         description: '',
-        maxParticipants: ''
+        maxParticipants: '',
+        recordType: 'both'
       });
     }
     setIsModalOpen(true);
@@ -76,7 +79,8 @@ export default function CohortManagement() {
       endDate: new Date(formData.endDate),
       status: formData.status,
       description: formData.description || undefined,
-      maxParticipants: formData.maxParticipants ? parseInt(formData.maxParticipants) : undefined
+      maxParticipants: formData.maxParticipants ? parseInt(formData.maxParticipants) : undefined,
+      recordType: formData.recordType
     };
 
     if (editingCohort) {
@@ -323,6 +327,65 @@ export default function CohortManagement() {
                     rows={3}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   />
+                </div>
+
+                {/* Record Type */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">
+                    기록 항목 설정
+                  </label>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="recordType"
+                        value="both"
+                        checked={formData.recordType === 'both'}
+                        onChange={(e) => setFormData({ ...formData, recordType: e.target.value as typeof formData.recordType })}
+                        className="mt-1 w-4 h-4 text-blue-600"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">둘다 (자기돌봄 + 타인친절)</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          참여자가 자기돌봄과 타인친절 행동을 모두 기록합니다 (디폴트)
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="recordType"
+                        value="self_care_only"
+                        checked={formData.recordType === 'self_care_only'}
+                        onChange={(e) => setFormData({ ...formData, recordType: e.target.value as typeof formData.recordType })}
+                        className="mt-1 w-4 h-4 text-blue-600"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">자기돌봄만</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          참여자가 자기돌봄 행동만 기록합니다
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="recordType"
+                        value="kindness_only"
+                        checked={formData.recordType === 'kindness_only'}
+                        onChange={(e) => setFormData({ ...formData, recordType: e.target.value as typeof formData.recordType })}
+                        className="mt-1 w-4 h-4 text-blue-600"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-slate-900">타인친절만</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          참여자가 타인친절 행동만 기록합니다
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Actions */}

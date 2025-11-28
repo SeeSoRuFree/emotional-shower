@@ -10,6 +10,7 @@ export interface Cohort {
   description?: string; // 기수 설명 (선택)
   createdAt: Date;
   maxParticipants?: number; // 최대 참여자 수 (선택)
+  recordType?: 'both' | 'self_care_only' | 'kindness_only'; // 기록 항목 타입 (디폴트: both)
 }
 
 interface CohortStore {
@@ -22,6 +23,7 @@ interface CohortStore {
     endDate: Date;
     description?: string;
     maxParticipants?: number;
+    recordType?: 'both' | 'self_care_only' | 'kindness_only';
   }) => string; // Returns cohort ID
   updateCohort: (cohortId: string, updates: Partial<Omit<Cohort, 'id' | 'createdAt'>>) => void;
   deleteCohort: (cohortId: string) => void;
@@ -42,7 +44,8 @@ const loadFromStorage = (): Cohort[] => {
         ...cohort,
         startDate: new Date(cohort.startDate),
         endDate: new Date(cohort.endDate),
-        createdAt: new Date(cohort.createdAt)
+        createdAt: new Date(cohort.createdAt),
+        recordType: cohort.recordType || 'both' // 기존 데이터 호환성: 없으면 'both'
       }));
     }
   } catch (error) {
@@ -72,6 +75,7 @@ export const useCohortStore = create<CohortStore>((set, get) => {
       endDate: new Date('2026-01-30'),
       status: 'recruiting',
       description: '테스트용 기수입니다',
+      recordType: 'both',
       createdAt: new Date()
     };
     storedCohorts.push(testCohort);
@@ -92,6 +96,7 @@ export const useCohortStore = create<CohortStore>((set, get) => {
         status: 'recruiting',
         description: data.description,
         maxParticipants: data.maxParticipants,
+        recordType: data.recordType || 'both', // 디폴트: both
         createdAt: new Date()
       };
 
