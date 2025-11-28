@@ -8,19 +8,28 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ResponsiveNav from '@/components/common/ResponsiveNav';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useCohortStore } from '@/store/cohortStore';
 import { useDailyRecordStore } from '@/store/dailyRecordStore';
 import { useSurveyStore } from '@/store/surveyStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { currentCohort, userChallenge, calculateCurrentDay, canAccessReport } = useChallengeStore();
+  const { currentUser, logout } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { getCurrentChallenge, calculateCurrentDay, canAccessReport } = useChallengeStore();
+  const { getCohortById } = useCohortStore();
   const { records } = useDailyRecordStore();
   const { preSurvey } = useSurveyStore();
   const [showSettings, setShowSettings] = useState(false);
 
-  const currentDay = userChallenge ? calculateCurrentDay() : 0;
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+  const currentCohort = cohortId ? getCohortById(cohortId) : null;
+
+  const currentDay = userChallenge && cohortId ? calculateCurrentDay(cohortId) : 0;
   const completionRate = userChallenge ? Math.round((userChallenge.completedDays.length / 30) * 100) : 0;
-  const hasReport = canAccessReport();
+  const hasReport = cohortId ? canAccessReport(cohortId) : false;
 
   // Calculate favorite actions
   const getFavoriteActions = () => {
@@ -71,9 +80,8 @@ export default function Profile() {
 
   const handleLogout = () => {
     if (confirm('정말 로그아웃하시겠어요? 모든 데이터는 브라우저에 안전하게 저장됩니다.')) {
-      localStorage.removeItem('hasCompletedOnboarding');
-      localStorage.removeItem('isLoggedIn');
-      navigate('/onboarding');
+      logout();
+      navigate('/login');
     }
   };
 

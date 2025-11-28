@@ -1,13 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Splash from '@/pages/Splash';
-import Onboarding from '@/pages/Onboarding';
+import Intro from '@/pages/Intro';
 import Home from '@/pages/Home';
 import Community from '@/pages/Community';
 import PostDetail from '@/components/community/PostDetail';
 import Profile from '@/pages/Profile';
 import { Toaster } from '@/components/ui/toaster';
-import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
 
 // Challenge pages
 import DailyRecord from '@/pages/DailyRecord';
@@ -15,14 +15,20 @@ import PreSurvey from '@/pages/PreSurvey';
 import PostSurvey from '@/pages/PostSurvey';
 import Report from '@/pages/Report';
 
+// Application pages
+import Signup from '@/pages/Signup';
+import Login from '@/pages/Login';
+import Apply from '@/pages/Apply';
+import Admin from '@/pages/Admin';
+
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const initializeCohort = useChallengeStore(state => state.initializeCohort);
+  const { isLoggedIn, checkAuth } = useAuthStore();
 
   useEffect(() => {
-    // Initialize current cohort on app start
-    initializeCohort();
+    // Check auth status
+    checkAuth();
 
     // For development: Clear onboarding state to test flow
     // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
@@ -32,11 +38,13 @@ function App() {
     // localStorage.removeItem('kindness-challenge');
     // localStorage.removeItem('kindness-daily-records');
     // localStorage.removeItem('kindness-surveys');
+    // localStorage.removeItem('kindness-users');
+    // localStorage.removeItem('kindness-auth');
 
     // Check if user has completed onboarding
     const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
     setHasCompletedOnboarding(!!completedOnboarding);
-  }, [initializeCohort]);
+  }, [checkAuth]);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -56,20 +64,26 @@ function App() {
       <div className="min-h-screen bg-background">
         <main id="main-content">
           <Routes>
-          <Route
-            path="/"
-            element={hasCompletedOnboarding ? <Navigate to="/home" /> : <Navigate to="/onboarding" />}
-          />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/pre-survey" element={<PreSurvey />} />
-          <Route path="/daily-record" element={<DailyRecord />} />
-          <Route path="/post-survey" element={<PostSurvey />} />
-          <Route path="/report" element={<Report />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/community/:roomId" element={<Community />} />
-          <Route path="/community/:roomId/:postId" element={<PostDetail />} />
-          <Route path="/profile" element={<Profile />} />
+          {/* 첫 방문자는 항상 Intro부터 시작 */}
+          <Route path="/" element={<Navigate to="/intro" />} />
+
+          {/* Public routes - 로그인 불필요 */}
+          <Route path="/intro" element={<Intro />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/apply" element={<Apply />} />
+          <Route path="/admin" element={<Admin />} />
+
+          {/* Protected routes - require login */}
+          <Route path="/home" element={isLoggedIn ? <Home /> : <Navigate to="/login" />} />
+          <Route path="/pre-survey" element={isLoggedIn ? <PreSurvey /> : <Navigate to="/login" />} />
+          <Route path="/daily-record" element={isLoggedIn ? <DailyRecord /> : <Navigate to="/login" />} />
+          <Route path="/post-survey" element={isLoggedIn ? <PostSurvey /> : <Navigate to="/login" />} />
+          <Route path="/report" element={isLoggedIn ? <Report /> : <Navigate to="/login" />} />
+          <Route path="/community" element={isLoggedIn ? <Community /> : <Navigate to="/login" />} />
+          <Route path="/community/:roomId" element={isLoggedIn ? <Community /> : <Navigate to="/login" />} />
+          <Route path="/community/:roomId/:postId" element={isLoggedIn ? <PostDetail /> : <Navigate to="/login" />} />
+          <Route path="/profile" element={isLoggedIn ? <Profile /> : <Navigate to="/login" />} />
           </Routes>
         </main>
         <Toaster />

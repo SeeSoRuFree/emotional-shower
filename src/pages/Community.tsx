@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Sparkles, Edit3, Send, Users, TrendingUp, Target, Award } from 'lucide-react';
+import { Heart, MessageCircle, Sparkles, Edit3, Send, Users, TrendingUp, Flame, Award, ArrowRight } from 'lucide-react';
 import ResponsiveNav from '@/components/common/ResponsiveNav';
 import { loadAllPosts, addPost, togglePostLike, generateCohortStats, type Post, type CohortStats } from '@/utils/communityStorage';
 import { recommendQuote } from '@/utils/quoteRecommendation';
 import { seedAllRoomsWithDummyData } from '@/utils/dummyData';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
+import { useCohortStore } from '@/store/cohortStore';
 
 // 배경 애니메이션 컴포넌트
 const FloatingShape = ({ delay }: { delay: number }) => (
@@ -33,28 +35,40 @@ const FloatingShape = ({ delay }: { delay: number }) => (
 
 export default function Community() {
   const navigate = useNavigate();
-  const { currentCohort, userChallenge, calculateCurrentDay } = useChallengeStore();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { getCurrentChallenge, calculateCurrentDay } = useChallengeStore();
+  const { getCohortById } = useCohortStore();
 
   const [isWriting, setIsWriting] = useState(false);
   const [postContent, setPostContent] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
   const [stats, setStats] = useState<CohortStats | null>(null);
 
-  const currentDay = userChallenge ? calculateCurrentDay() : 0;
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+  const currentCohort = cohortId ? getCohortById(cohortId) : null;
+
+  const currentDay = userChallenge && cohortId ? calculateCurrentDay(cohortId) : 0;
   const userStamps = userChallenge?.completedDays.length || 0;
 
   // 더미 데이터 생성 및 게시글 로드
   useEffect(() => {
+    if (!cohortId) return;
+
     seedAllRoomsWithDummyData();
     const allPosts = loadAllPosts();
-    setPosts(allPosts);
+
+    // 현재 기수의 게시글만 필터링
+    const cohortPosts = allPosts.filter(post => post.cohortId === cohortId);
+    setPosts(cohortPosts);
 
     // 기수 통계 생성
     if (currentCohort && userChallenge) {
-      const cohortStats = generateCohortStats(currentCohort.id, userStamps);
+      const cohortStats = generateCohortStats(currentCohort.id, userStamps, currentDay);
       setStats(cohortStats);
     }
-  }, [currentCohort, userStamps]);
+  }, [cohortId, currentCohort, userStamps]);
 
   const handleStartWriting = () => {
     setIsWriting(true);
@@ -66,12 +80,12 @@ export default function Community() {
   };
 
   const handleSubmitPost = () => {
-    if (postContent.trim()) {
+    if (postContent.trim() && cohortId) {
       // 명언 추천 (기본 감정은 'celebrate'로)
       const recommendedQuote = recommendQuote(postContent, 'celebrate');
 
-      // 게시글 추가 (unified feed, roomId는 'unified'로)
-      const newPost = addPost('unified', postContent, recommendedQuote || undefined);
+      // 게시글 추가 (unified feed, roomId는 'unified'로, cohortId 포함)
+      const newPost = addPost('unified', cohortId, postContent, recommendedQuote || undefined);
 
       // UI 업데이트
       setPosts(prev => [newPost, ...prev]);
@@ -127,6 +141,49 @@ export default function Community() {
         </div>
       </motion.div>
 
+      {/* 카카오 오픈채팅방 배너 */}
+      <div className="relative z-10 px-6 pt-6">
+        <motion.a
+          href="https://open.kakao.com/o/PLACEHOLDER"
+          target="_blank"
+          rel="noopener noreferrer"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="block bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-500 rounded-3xl p-5 shadow-soft-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+        >
+          {/* 배경 패턴 */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12" />
+          </div>
+
+          <div className="relative flex items-center gap-4">
+            {/* 아이콘 */}
+            <div className="flex-shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-soft">
+              <MessageCircle className="w-6 h-6 text-yellow-600" fill="currentColor" />
+            </div>
+
+            {/* 텍스트 */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-yellow-900 mb-1">
+                💬 실시간 오픈채팅방
+              </h3>
+              <p className="text-sm text-yellow-800">
+                같은 기수 참여자들과 실시간으로 소통해보세요
+              </p>
+            </div>
+
+            {/* 화살표 */}
+            <div className="flex-shrink-0">
+              <ArrowRight className="w-6 h-6 text-yellow-900" strokeWidth={2.5} />
+            </div>
+          </div>
+        </motion.a>
+      </div>
+
       {/* 통계 카드 섹션 */}
       {stats && (
         <div className="relative z-10 px-6 py-6">
@@ -167,18 +224,18 @@ export default function Community() {
               </p>
             </motion.div>
 
-            {/* 22일 도달 예상자 */}
+            {/* 연속 기록자 */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
-              className="bg-gradient-to-br from-headspace-pastel-green to-green-100 rounded-3xl p-5 shadow-soft"
+              className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-3xl p-5 shadow-soft"
             >
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-headspace-green" />
+                  <Flame className="w-4 h-4 text-orange-500" />
                 </div>
-                <span className="text-sm font-medium text-headspace-green">리포트 가능</span>
+                <span className="text-sm font-medium text-orange-600">연속 기록자</span>
               </div>
               <div className="mb-2">
                 <motion.span
@@ -187,12 +244,12 @@ export default function Community() {
                   transition={{ delay: 0.4, type: "spring" }}
                   className="text-3xl font-bold text-headspace-darkGray"
                 >
-                  {stats.eligibleFor22Days}
+                  {stats.perfectStreakUsers}
                 </motion.span>
                 <span className="text-lg text-headspace-textMuted ml-1">명</span>
               </div>
               <p className="text-xs text-headspace-textMuted">
-                💪 22일 도달 예상자
+                🔥 완벽하게 매일 기록 중
               </p>
             </motion.div>
 

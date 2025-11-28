@@ -9,50 +9,86 @@ const slides = [
     emoji: null,
     icon: (
       <div className="relative w-16 h-16">
-        <div className="absolute inset-0 bg-gradient-to-br from-headspace-blue to-headspace-pastel-blue rounded-full animate-pulse" />
-        <div className="absolute inset-2 bg-white rounded-full" />
-        <div className="absolute inset-4 bg-gradient-to-br from-headspace-blue to-headspace-pastel-blue rounded-full" />
+        <motion.div
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute inset-0 bg-gradient-to-br from-gray-400 to-gray-300 rounded-2xl opacity-60"
+        />
+        <div className="absolute inset-2 bg-white rounded-xl" />
+        <div className="absolute inset-4 bg-gradient-to-br from-gray-500 to-gray-400 rounded-lg" />
       </div>
     ),
-    title: '매일 샤워하듯\n마음도 씻어요',
-    description: '하루 3번, 간단한 감정 체크인으로\n마음 건강을 챙기세요',
-    bgGradient: 'from-headspace-pastel-blue to-blue-100',
+    title: '바쁜 일상 속\n내 마음 돌보고 계신가요?',
+    description: '정신건강, 나중으로 미루고 계시진 않나요?\n매일 조금씩 관리하면 달라집니다',
+    bgGradient: 'from-gray-100 to-blue-50',
     illustration: (
       <div className="relative w-48 h-48 mx-auto">
-        {/* 중심 원 */}
-        <motion.div
-          animate={{ 
-            scale: [1, 1.2, 1],
-            rotate: [0, 180, 360]
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <div className="w-32 h-32 bg-gradient-to-br from-headspace-blue to-headspace-pastel-blue rounded-full opacity-80" />
-        </motion.div>
-        {/* 궤도 원들 */}
-        {[0, 120, 240].map((rotation, i) => (
+        {/* 바쁜 일상을 표현하는 회전하는 원들 */}
+        {[0, 60, 120, 180, 240, 300].map((rotation, i) => (
           <motion.div
             key={i}
-            animate={{ 
-              rotate: [rotation, rotation + 360]
+            animate={{
+              rotate: [rotation, rotation + 360],
+              scale: [1, 0.8, 1]
             }}
-            transition={{ duration: 10 + i * 2, repeat: Infinity, ease: "linear" }}
+            transition={{
+              duration: 8 - i * 0.5,
+              repeat: Infinity,
+              ease: "linear"
+            }}
             className="absolute inset-0"
           >
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-8 bg-gradient-to-br from-headspace-yellow to-headspace-pastel-yellow rounded-full" />
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-6 h-6 bg-gray-300 rounded-full opacity-50" />
           </motion.div>
         ))}
         <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.6, 0.3] }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
           transition={{ duration: 3, repeat: Infinity }}
-          className="absolute inset-0 bg-headspace-pastel-blue rounded-full blur-3xl"
-        />
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-300 rounded-full" />
+        </motion.div>
       </div>
     )
   },
   {
     id: 2,
+    emoji: null,
+    icon: (
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 bg-gradient-to-br from-headspace-blue to-headspace-purple rounded-2xl" />
+        <div className="absolute inset-2 bg-white rounded-xl flex items-center justify-center">
+          <span className="text-2xl font-bold text-headspace-blue">30</span>
+        </div>
+      </div>
+    ),
+    title: '30일간의\n친절함 챌린지',
+    description: '매일 감정을 기록하고 나누는\n구조화된 정신건강 프로그램',
+    bgGradient: 'from-headspace-pastel-blue to-headspace-pastel-purple',
+    illustration: (
+      <div className="relative w-56 h-40 mx-auto">
+        {/* 30일 타임라인 */}
+        <div className="flex items-center gap-1 justify-center flex-wrap max-w-[220px] mx-auto">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{
+                delay: i * 0.03,
+                repeat: Infinity,
+                repeatDelay: 2,
+                duration: 0.3
+              }}
+              className="w-6 h-6 bg-gradient-to-br from-headspace-blue to-headspace-purple rounded-md opacity-80"
+            />
+          ))}
+        </div>
+      </div>
+    )
+  },
+  {
+    id: 3,
     emoji: null,
     icon: (
       <div className="relative w-16 h-16">
@@ -65,8 +101,8 @@ const slides = [
         <div className="absolute inset-4 bg-gradient-to-br from-headspace-yellow to-yellow-300 rounded-lg" />
       </div>
     ),
-    title: '하루 3번\n감정 기록하기',
-    description: '행복해요, 평온해요, 도움이 필요해요\n세 가지 버튼으로 쉽게 기록해요',
+    title: '하루 3번\n감정 체크인',
+    description: '행복해요, 평온해요, 도움이 필요해요\n간단한 기록으로 시작하세요',
     bgGradient: 'from-headspace-pastel-yellow to-yellow-100',
     illustration: (
       <div className="flex justify-center gap-4">
@@ -77,14 +113,14 @@ const slides = [
         ].map((item, i) => (
           <motion.div
             key={i}
-            animate={{ 
+            animate={{
               y: [0, -10, 0],
               scale: [1, 1.1, 1]
             }}
-            transition={{ 
+            transition={{
               duration: 2,
               delay: i * 0.2,
-              repeat: Infinity 
+              repeat: Infinity
             }}
             className={`w-16 h-16 bg-white ${item.shape} shadow-soft flex items-center justify-center overflow-hidden`}
           >
@@ -95,41 +131,53 @@ const slides = [
     )
   },
   {
-    id: 3,
+    id: 4,
     emoji: null,
     icon: (
       <div className="relative w-16 h-16">
-        <div className="absolute inset-0 bg-gradient-to-br from-headspace-purple to-headspace-pastel-purple rounded-3xl transform rotate-45" />
-        <div className="absolute inset-2 bg-white rounded-2xl transform rotate-45" />
-        <div className="absolute inset-4 bg-gradient-to-br from-headspace-purple to-purple-300 rounded-xl transform rotate-45" />
+        <div className="absolute inset-0 bg-gradient-to-br from-headspace-green to-green-300 rounded-2xl" />
+        <div className="absolute inset-2 bg-white rounded-xl" />
+        <div className="absolute inset-1 flex items-center justify-center">
+          <div className="w-10 h-10 bg-gradient-to-br from-headspace-green to-green-400 rounded-xl flex items-center justify-center">
+            <div className="w-6 h-1 bg-white rounded-full" />
+            <div className="w-1 h-6 bg-white rounded-full absolute" />
+          </div>
+        </div>
       </div>
     ),
-    title: '5분 대화로\n마음 정리하기',
-    description: 'AI와 함께하는 정서샤워 톡\n오늘의 감정을 따뜻하게 마무리해요',
-    bgGradient: 'from-headspace-pastel-purple to-purple-100',
+    title: '30일 후 받는\n나만의 정신건강 리포트',
+    description: '감정 패턴 분석과 인사이트\n실제 도움이 되는 분석 리포트',
+    bgGradient: 'from-headspace-pastel-green to-green-100',
     illustration: (
-      <div className="relative w-64 h-48 mx-auto">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ repeat: Infinity, duration: 3, repeatType: "reverse" }}
-          className="absolute left-0 top-0 bg-white rounded-2xl p-3 shadow-soft max-w-[150px]"
-        >
-          <p className="text-sm text-headspace-darkGray">오늘 어떤 일이 있으셨나요?</p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 1, repeat: Infinity, duration: 3, repeatType: "reverse" }}
-          className="absolute right-0 bottom-0 bg-headspace-blue text-white rounded-2xl p-3 shadow-soft max-w-[150px]"
-        >
-          <p className="text-sm">좋은 일이 있었어요!</p>
-        </motion.div>
+      <div className="relative w-64 h-40 mx-auto">
+        {/* 리포트/그래프 형태 */}
+        <div className="bg-white/80 rounded-2xl p-4 shadow-soft">
+          <div className="flex items-end justify-between gap-2 h-24">
+            {[60, 40, 80, 55, 90, 70].map((height, i) => (
+              <motion.div
+                key={i}
+                initial={{ height: 0 }}
+                animate={{ height: `${height}%` }}
+                transition={{
+                  delay: i * 0.1,
+                  repeat: Infinity,
+                  repeatDelay: 2,
+                  duration: 0.5
+                }}
+                className={`flex-1 bg-gradient-to-t ${
+                  i % 3 === 0 ? 'from-headspace-green to-green-300' :
+                  i % 3 === 1 ? 'from-headspace-blue to-blue-300' :
+                  'from-headspace-purple to-purple-300'
+                } rounded-t-lg`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     )
   },
   {
-    id: 4,
+    id: 5,
     emoji: null,
     icon: (
       <div className="relative w-16 h-16 flex items-center justify-center">
@@ -139,8 +187,8 @@ const slides = [
         <div className="absolute w-10 h-10 bg-gradient-to-br from-headspace-blue to-blue-300 rounded-full transform -translate-x-2 translate-y-2" />
       </div>
     ),
-    title: '함께 나누는\n공동 샤워방',
-    description: '비슷한 감정을 느끼는 사람들과\n따뜻한 위로를 나누세요',
+    title: '함께하는 기수들과\n나누는 여정',
+    description: '같은 시기에 시작한 동기들과\n따뜻한 위로와 응원을 나눠요',
     bgGradient: 'from-headspace-pastel-pink to-pink-100',
     illustration: (
       <div className="grid grid-cols-2 gap-3 max-w-[200px] mx-auto">
@@ -153,25 +201,25 @@ const slides = [
           <motion.div
             key={i}
             whileHover={{ scale: 1.1 }}
-            animate={{ 
+            animate={{
               rotate: [0, 5, -5, 0],
               scale: [1, 1.05, 1]
             }}
-            transition={{ 
+            transition={{
               duration: 3,
               delay: i * 0.3,
-              repeat: Infinity 
+              repeat: Infinity
             }}
             className={`w-20 h-20 bg-white/80 ${item.shape} shadow-soft flex items-center justify-center overflow-hidden`}
           >
             <motion.div
-              animate={{ 
+              animate={{
                 rotate: [0, -5, 5, 0]
               }}
-              transition={{ 
+              transition={{
                 duration: 4,
                 delay: i * 0.2,
-                repeat: Infinity 
+                repeat: Infinity
               }}
               className={`w-14 h-14 bg-gradient-to-br ${item.gradient} ${item.shape}`}
             />
@@ -202,15 +250,12 @@ export default function Intro() {
 
   const handleSkip = () => {
     localStorage.setItem('hasSeenIntro', 'true');
-    navigate('/onboarding');
+    navigate('/apply');
   };
 
-  const handleLogin = () => {
-    // Mock 카카오 로그인 - 온보딩으로 이동
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('loginMethod', 'kakao');
+  const handleApply = () => {
     localStorage.setItem('hasSeenIntro', 'true');
-    navigate('/onboarding');
+    navigate('/apply');
   };
 
   // Touch handlers for swipe
@@ -224,7 +269,7 @@ export default function Intro() {
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -238,7 +283,7 @@ export default function Intro() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen relative overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -318,36 +363,35 @@ export default function Intro() {
             ))}
           </div>
 
-          {/* Navigation buttons or Login */}
+          {/* Navigation buttons or Apply */}
           {currentSlide === slides.length - 1 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              {/* Kakao Login Button */}
+              {/* Apply Button */}
               <button
-                onClick={handleLogin}
-                className="w-full py-4 bg-[#FEE500] rounded-2xl flex items-center justify-center gap-3 shadow-soft hover:shadow-soft-lg transition-all"
+                onClick={handleApply}
+                className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-2xl flex items-center justify-center gap-3 shadow-soft hover:shadow-soft-lg transition-all font-semibold"
               >
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
-                  <path 
-                    d="M12 3C6.48 3 2 6.65 2 11.18C2 14.25 4.07 16.92 7.23 18.27L6.29 21.52C6.23 21.74 6.49 21.93 6.68 21.8L10.52 19.14C11 19.2 11.5 19.23 12 19.23C17.52 19.23 22 15.58 22 11.05C22 6.52 17.52 3 12 3Z" 
-                    fill="#3C1E1E"
-                  />
-                </svg>
-                <span className="text-[#3C1E1E] font-semibold text-lg">
-                  카카오 로그인
-                </span>
+                챌린지 신청하기 →
               </button>
 
-              {/* Alternative login options */}
+              {/* Info text */}
               <div className="mt-4 text-center">
+                <p className="text-headspace-textMuted text-sm">
+                  💡 신청 후 승인되면 이메일로 코드를 보내드려요
+                </p>
+              </div>
+
+              {/* Login link */}
+              <div className="mt-3 text-center">
                 <button
-                  onClick={handleSkip}
-                  className="text-headspace-textMuted text-sm"
+                  onClick={() => navigate('/login')}
+                  className="text-headspace-textMuted hover:text-headspace-darkGray text-sm"
                 >
-                  로그인 없이 시작하기
+                  이미 계정이 있으신가요? 로그인
                 </button>
               </div>
             </motion.div>

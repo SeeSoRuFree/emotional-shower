@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
 import { useSurveyStore, type SurveyResponse } from '@/store/surveyStore';
 
 // Survey sections configuration
@@ -84,11 +85,14 @@ const LIKERT_OPTIONS = [
   { value: 5, label: '매우 그렇다' }
 ];
 
-type Step = 'intro' | 'section' | 'outro' | 'completed';
+type Step = 'intro' | 'section' | 'outro';
 
 export default function PreSurvey() {
   const navigate = useNavigate();
-  const { startChallenge } = useChallengeStore();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { startChallenge, completeDay } = useChallengeStore();
   const { submitPreSurvey } = useSurveyStore();
 
   const [step, setStep] = useState<Step>('intro');
@@ -135,6 +139,7 @@ export default function PreSurvey() {
     } else {
       setStep('outro');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePrevSection = () => {
@@ -142,9 +147,12 @@ export default function PreSurvey() {
       setCurrentSectionIndex(prev => prev - 1);
       setStep('section');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleComplete = () => {
+    if (!cohortId) return;
+
     // Convert answers to SurveyResponse format
     const surveyResponses: SurveyResponse[] = Object.entries(answers).map(([questionId, value]) => ({
       questionId,
@@ -152,15 +160,21 @@ export default function PreSurvey() {
     }));
 
     submitPreSurvey(surveyResponses);
-    startChallenge();
+    startChallenge(cohortId);
+
+    // 사전 설문 = DAY 1 완료 처리
+    completeDay(cohortId, 1);
+
     localStorage.removeItem('pre-survey-progress');
-    setStep('completed');
+
+    // 홈으로 이동 (DAY 2 시작)
+    navigate('/home');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-blue via-white to-headspace-pastel-green">
       {/* Progress Bar */}
-      {step !== 'intro' && step !== 'completed' && (
+      {step !== 'intro' && (
         <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-10">
           <div className="max-w-lg mx-auto px-6 py-4">
             <div className="flex items-center justify-between mb-2">
@@ -234,7 +248,10 @@ export default function PreSurvey() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setStep('section')}
+                  onClick={() => {
+                    setStep('section');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
                   className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg flex items-center justify-center gap-2"
                 >
                   시작하기
@@ -372,45 +389,8 @@ export default function PreSurvey() {
                   onClick={handleComplete}
                   className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg flex items-center justify-center gap-2"
                 >
-                  DAY 1 기록하기
+                  DAY 1 완료! 홈으로 가기
                   <ArrowRight className="w-5 h-5" />
-                </motion.button>
-              </motion.div>
-            )}
-
-            {/* Completed Step */}
-            {step === 'completed' && (
-              <motion.div
-                key="completed"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-3xl p-8 shadow-soft-lg text-center"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [0, 1.3, 1] }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                  className="text-8xl mb-6"
-                >
-                  🎉
-                </motion.div>
-
-                <h2 className="text-2xl font-bold text-headspace-darkGray mb-4">
-                  챌린지 시작!
-                </h2>
-
-                <p className="text-headspace-textMuted mb-8">
-                  오늘부터 30일간<br />
-                  나와 타인을 향한 친절을 연습해보세요
-                </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/home')}
-                  className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg"
-                >
-                  홈으로 가기
                 </motion.button>
               </motion.div>
             )}

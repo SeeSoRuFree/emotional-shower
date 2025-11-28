@@ -158,15 +158,15 @@ const seedRoomData = (roomId: string) => {
     // 게시글 추가 (2-4일 전 분산)
     const postTimestamp = getRandomTimestamp(index + 1);
     const recommendedQuote = recommendQuote(postData.content, roomId);
-    
-    // 게시글 생성
-    const post = addPost(roomId, postData.content, recommendedQuote || undefined);
-    
+
+    // 게시글 생성 (더미 데이터는 'cohort-1'로 고정)
+    const post = addPost(roomId, 'cohort-1', postData.content, recommendedQuote || undefined);
+
     // 댓글 추가 (게시글 이후 시간대에 분산)
     postData.comments.forEach((commentContent, commentIndex) => {
       // 게시글 작성 후 몇 시간 후에 댓글 달린 것처럼
       const commentDelayHours = (commentIndex + 1) * Math.random() * 6; // 0-6시간 랜덤 지연
-      
+
       setTimeout(() => {
         addComment(roomId, post.id, commentContent);
       }, commentIndex * 100); // 순서 보장을 위한 작은 지연

@@ -7,6 +7,8 @@ import StampBoard from '@/components/challenge/StampBoard';
 import ProgressBar from '@/components/challenge/ProgressBar';
 import SkyBackground from '@/components/cloud/SkyBackground';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useCohortStore } from '@/store/cohortStore';
+import { useAuthStore } from '@/store/authStore';
 import { useDailyRecordStore } from '@/store/dailyRecordStore';
 import { useSurveyStore } from '@/store/surveyStore';
 
@@ -36,24 +38,35 @@ const FloatingShape = ({ delay }: { delay: number }) => (
 export default function Home() {
   const navigate = useNavigate();
 
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
   const {
-    currentCohort,
-    userChallenge,
+    getCurrentChallenge,
     approveChallenge,
     canStartPreSurvey,
     calculateCurrentDay,
     canAccessReport
   } = useChallengeStore();
 
+  const { getCohortById } = useCohortStore();
   const { getTodayRecord } = useDailyRecordStore();
   const { preSurvey, postSurvey } = useSurveyStore();
+
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+  const currentCohort = cohortId ? getCohortById(cohortId) : null;
 
   const [currentDay, setCurrentDay] = useState(0);
   const [todayCompleted, setTodayCompleted] = useState(false);
 
   useEffect(() => {
-    if (userChallenge) {
-      const day = calculateCurrentDay();
+    if (userChallenge && cohortId) {
+      const day = calculateCurrentDay(cohortId);
+      console.log('🏠 [Home] useEffect 실행:', {
+        day,
+        completedDays: userChallenge.completedDays,
+        completedDaysLength: userChallenge.completedDays.length
+      });
       setCurrentDay(day);
 
       // Check if today's record is completed
@@ -65,9 +78,9 @@ export default function Home() {
         navigate('/post-survey');
       }
     }
-  }, [userChallenge, calculateCurrentDay, getTodayRecord, postSurvey, navigate]);
+  }, [userChallenge, cohortId, calculateCurrentDay, getTodayRecord, postSurvey, navigate]);
 
-  // 1) 미신청 상태 - 신청 안내
+  // 1) 미신청 상태 - 사전 설문 안내
   if (!userChallenge) {
     return (
       <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col">
@@ -92,7 +105,7 @@ export default function Home() {
             </motion.div>
 
             <h1 className="text-3xl font-bold text-headspace-darkGray mb-4">
-              친절함을 연습하는 시간
+              30일 친절 챌린지
             </h1>
 
             <p className="text-headspace-textMuted mb-2">
@@ -134,124 +147,6 @@ export default function Home() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/onboarding')}
-              className="w-full max-w-sm py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg"
-            >
-              챌린지 신청하기 →
-            </motion.button>
-
-            <p className="text-xs text-headspace-textMuted mt-4">
-              💡 신청 → 승인 → 사전 설문 완료 후 챌린지 시작
-            </p>
-          </motion.div>
-        </div>
-
-        <ResponsiveNav />
-      </SkyBackground>
-    );
-  }
-
-  // 2) 승인 대기 상태
-  if (userChallenge.status === 'waiting') {
-    return (
-      <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(3)].map((_, i) => (
-            <FloatingShape key={i} delay={i * 2} />
-          ))}
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-32 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center max-w-md"
-          >
-            <motion.div
-              animate={{ rotate: [0, 360] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="text-6xl mb-6"
-            >
-              🕐
-            </motion.div>
-
-            <h1 className="text-3xl font-bold text-headspace-darkGray mb-4">
-              승인 대기 중
-            </h1>
-
-            <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-soft mt-6 mb-8">
-              <p className="text-headspace-textMuted mb-4">
-                {currentCohort?.name} 신청이 완료되었습니다
-              </p>
-              <p className="text-sm text-headspace-textMuted">
-                곧 승인 안내를 보내드릴게요
-              </p>
-            </div>
-
-            {/* 테스트용 승인 버튼 */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={approveChallenge}
-              className="w-full max-w-sm py-4 bg-gradient-to-r from-headspace-green to-green-400 text-white rounded-full font-semibold shadow-soft-lg"
-            >
-              [테스트] 승인하기
-            </motion.button>
-
-            <p className="text-xs text-headspace-textMuted mt-4">
-              ⚡ 테스트용 승인 버튼입니다
-            </p>
-          </motion.div>
-        </div>
-
-        <ResponsiveNav />
-      </SkyBackground>
-    );
-  }
-
-  // 3) 승인 완료, 사전 설문 대기
-  if (userChallenge.status === 'approved') {
-    return (
-      <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(3)].map((_, i) => (
-            <FloatingShape key={i} delay={i * 2} />
-          ))}
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-32 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center max-w-md"
-          >
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="text-6xl mb-6"
-            >
-              ✅
-            </motion.div>
-
-            <h1 className="text-3xl font-bold text-headspace-darkGray mb-4">
-              승인 완료!
-            </h1>
-
-            <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-soft mt-6 mb-8">
-              <p className="text-headspace-darkGray font-semibold mb-3">
-                {currentCohort?.name}
-              </p>
-              <p className="text-headspace-textMuted mb-4">
-                사전 설문을 완료하면 챌린지가 시작됩니다
-              </p>
-              <p className="text-sm text-headspace-textMuted">
-                설문은 약 10분 정도 소요됩니다
-              </p>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
               onClick={() => navigate('/pre-survey')}
               className="w-full max-w-sm py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg"
             >
@@ -259,7 +154,7 @@ export default function Home() {
             </motion.button>
 
             <p className="text-xs text-headspace-textMuted mt-4">
-              📝 설문 완료 후 DAY 1 기록을 시작할 수 있어요
+              💡 사전 설문 완료 → DAY 1 기록 시작
             </p>
           </motion.div>
         </div>
@@ -269,7 +164,7 @@ export default function Home() {
     );
   }
 
-  // 4) active 상태인데 사전 설문 미완료
+  // 2) 사전 설문 미완료 상태 (active 상태인데 사전 설문 미완료)
   if (userChallenge.status === 'active' && !preSurvey) {
     return (
       <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col">
@@ -279,7 +174,7 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-32 relative z-10">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 pt-20 md:pt-32 pb-32 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -294,16 +189,32 @@ export default function Home() {
             </motion.div>
 
             <h1 className="text-3xl font-bold text-headspace-darkGray mb-4">
-              사전 설문 필요
+              🌱 챌린지의 첫 시작
             </h1>
 
-            <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-soft mt-6 mb-8">
-              <p className="text-headspace-textMuted mb-4">
-                DAY 1 기록을 시작하기 전에
-              </p>
-              <p className="text-sm text-headspace-darkGray font-semibold">
-                사전 설문을 완료해주세요
-              </p>
+            <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-soft mt-6 mb-8 text-left">
+              <h2 className="font-bold text-headspace-darkGray mb-3 text-center">
+                사전 설문으로 DAY 1을 시작합니다
+              </h2>
+
+              <div className="space-y-3 text-sm text-headspace-textMuted">
+                <p>
+                  <strong className="text-headspace-darkGray">DAY 1</strong>은 사전 설문으로 시작합니다.
+                  약 10분 정도 소요되는 설문이지만, 30일 후 변화를 측정하기 위해
+                  <strong className="text-headspace-darkGray"> 진지하게 답변</strong>해주세요.
+                </p>
+
+                <div className="bg-headspace-pastel-blue/30 rounded-xl p-3">
+                  <p className="text-xs">
+                    📅 <strong className="text-headspace-darkGray">DAY 2-29</strong>: 매일 3-5분 자기돌봄과 타인친절 기록<br/>
+                    📝 <strong className="text-headspace-darkGray">DAY 30</strong>: 동일한 설문을 다시 진행하여 변화 측정
+                  </p>
+                </div>
+
+                <p className="text-xs text-center text-headspace-darkGray">
+                  지금 시작하는 설문이 여러분의 성장을 측정하는 기준점이 됩니다
+                </p>
+              </div>
             </div>
 
             <motion.button
@@ -312,11 +223,11 @@ export default function Home() {
               onClick={() => navigate('/pre-survey')}
               className="w-full max-w-sm py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg"
             >
-              사전 설문 시작하기 →
+              DAY 1 시작하기 (사전 설문) →
             </motion.button>
 
             <p className="text-xs text-headspace-textMuted mt-4">
-              ⏱️ 약 10분 소요됩니다
+              ⏱️ 약 10분 소요 · 34개 문항
             </p>
           </motion.div>
         </div>
@@ -408,7 +319,7 @@ export default function Home() {
           <ProgressBar
             completedCount={userChallenge.completedDays.length}
             targetCount={22}
-            canAccessReport={canAccessReport()}
+            canAccessReport={cohortId ? canAccessReport(cohortId) : false}
           />
         </motion.div>
 
@@ -457,7 +368,7 @@ export default function Home() {
         </motion.div>
 
         {/* Report access (if eligible) */}
-        {canAccessReport() && userChallenge.status === 'completed' && (
+        {cohortId && canAccessReport(cohortId) && userChallenge.status === 'completed' && (
           <motion.button
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

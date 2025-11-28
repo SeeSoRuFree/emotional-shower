@@ -8,6 +8,7 @@ import MemoModal from '@/components/daily/MemoModal';
 import QuoteCard from '@/components/daily/QuoteCard';
 import SkyBackground from '@/components/cloud/SkyBackground';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
 import { useDailyRecordStore } from '@/store/dailyRecordStore';
 import type { Action } from '@/store/dailyRecordStore';
 import { SELF_CARE_EXAMPLES, KINDNESS_EXAMPLES, getRandomQuote } from '@/utils/quotes';
@@ -17,7 +18,10 @@ type Step = 'selfCare' | 'kindness' | 'quote' | 'completed';
 export default function DailyRecord() {
   const navigate = useNavigate();
 
-  const { userChallenge, calculateCurrentDay, completeDay } = useChallengeStore();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { getCurrentChallenge, calculateCurrentDay, completeDay } = useChallengeStore();
   const {
     getTodayRecord,
     addSelfCareAction,
@@ -28,7 +32,10 @@ export default function DailyRecord() {
     completeRecord
   } = useDailyRecordStore();
 
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+
   const [currentDay, setCurrentDay] = useState(0);
+  const [completedDayNumber, setCompletedDayNumber] = useState(0);
   const [step, setStep] = useState<Step>('selfCare');
   const [selectedQuote, setSelectedQuote] = useState('');
 
@@ -43,19 +50,22 @@ export default function DailyRecord() {
   const kindnessActions = todayRecord?.kindnessActions || [];
 
   useEffect(() => {
-    if (!userChallenge) {
+    if (!userChallenge || !cohortId) {
       navigate('/home');
       return;
     }
 
-    const day = calculateCurrentDay();
+    const day = calculateCurrentDay(cohortId);
+    console.log('📝 [DailyRecord] useEffect 실행:', { day, currentDay });
     setCurrentDay(day);
 
     // Check if already completed today
-    if (todayRecord?.isCompleted) {
+    const record = getTodayRecord(day);
+    if (record?.isCompleted) {
+      console.log('⚠️ [DailyRecord] 이미 완료된 기록, 홈으로 리다이렉트');
       navigate('/home');
     }
-  }, [userChallenge, calculateCurrentDay, navigate, todayRecord]);
+  }, [userChallenge, cohortId, calculateCurrentDay, navigate, getTodayRecord]);
 
   const handleAddSelfCare = (label: string, isCustom: boolean) => {
     addSelfCareAction(currentDay, label, isCustom);
@@ -103,11 +113,18 @@ export default function DailyRecord() {
   };
 
   const handleComplete = () => {
+    if (!cohortId) return;
+
+    console.log('🎯 [DailyRecord] handleComplete 호출:', { currentDay, cohortId });
+
+    // Store the day number BEFORE completing (to show correct day in completion screen)
+    setCompletedDayNumber(currentDay);
+
     // Complete record with quote
     completeRecord(currentDay, selectedQuote);
 
     // Mark day as completed in challenge
-    completeDay(currentDay);
+    completeDay(cohortId, currentDay);
 
     // Show completed state briefly
     setStep('completed');
@@ -285,7 +302,7 @@ export default function DailyRecord() {
               스탬프 획득!
             </h2>
             <p className="text-headspace-textMuted">
-              DAY {currentDay} 기록 완료
+              DAY {completedDayNumber} 기록 완료
             </p>
           </motion.div>
         </div>

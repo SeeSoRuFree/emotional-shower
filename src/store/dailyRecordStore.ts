@@ -45,14 +45,14 @@ const loadFromStorage = (): DailyRecord[] => {
       const records = JSON.parse(stored);
       return records.map((record: any) => ({
         ...record,
-        selfCareActions: record.selfCareActions.map((action: any) => ({
+        selfCareActions: record.selfCareActions?.map((action: any) => ({
           ...action,
           timestamp: new Date(action.timestamp)
-        })),
-        kindnessActions: record.kindnessActions.map((action: any) => ({
+        })) || [],
+        kindnessActions: record.kindnessActions?.map((action: any) => ({
           ...action,
           timestamp: new Date(action.timestamp)
-        })),
+        })) || [],
         completedAt: record.completedAt ? new Date(record.completedAt) : undefined
       }));
     }

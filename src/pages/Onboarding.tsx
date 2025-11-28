@@ -1,25 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Heart, Calendar, FileText, Users, Check } from 'lucide-react';
+import { ArrowRight, Heart, Calendar, FileText, Users } from 'lucide-react';
 import { useChallengeStore } from '@/store/challengeStore';
 
-type OnboardingStep = 'welcome' | 'intro' | 'consent' | 'submitted';
+type OnboardingStep = 'welcome' | 'intro' | 'consent';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { currentCohort, applyChallenge } = useChallengeStore();
+  const { currentCohort } = useChallengeStore();
 
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [agreed, setAgreed] = useState(false);
 
   const handleSubmit = () => {
-    if (currentCohort) {
-      // 챌린지 신청 (waiting 상태로)
-      applyChallenge(currentCohort.id);
-      localStorage.setItem('hasCompletedOnboarding', 'true');
-      setStep('submitted');
-    }
+    // 온보딩 완료 표시
+    localStorage.setItem('hasCompletedOnboarding', 'true');
+    // 사전 설문으로 이동
+    navigate('/pre-survey');
   };
 
   return (
@@ -215,60 +213,12 @@ export default function Onboarding() {
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  챌린지 신청하기
+                  동의하고 사전 설문 시작하기
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </motion.div>
             )}
 
-            {/* Submitted Step */}
-            {step === 'submitted' && (
-              <motion.div
-                key="submitted"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-3xl p-8 shadow-soft-lg text-center"
-              >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [0, 1.3, 1] }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                  className="text-6xl mb-6"
-                >
-                  🎉
-                </motion.div>
-
-                <h2 className="text-2xl font-bold text-headspace-darkGray mb-4">
-                  신청이 완료되었습니다!
-                </h2>
-
-                <div className="bg-gradient-to-br from-headspace-pastel-blue to-headspace-pastel-purple rounded-2xl p-6 mb-6">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Check className="w-5 h-5 text-headspace-blue" />
-                    <p className="font-semibold text-headspace-darkGray">
-                      {currentCohort?.name} 신청 완료
-                    </p>
-                  </div>
-                  <p className="text-sm text-headspace-textMuted">
-                    승인 후 기수 시작 전에 알려드릴게요
-                  </p>
-                </div>
-
-                <p className="text-sm text-headspace-textMuted mb-6">
-                  승인되면 <strong>사전 설문</strong>을 진행하신 후<br />
-                  챌린지를 시작하실 수 있습니다
-                </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/home')}
-                  className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg"
-                >
-                  홈으로 가기
-                </motion.button>
-              </motion.div>
-            )}
           </AnimatePresence>
         </div>
       </div>

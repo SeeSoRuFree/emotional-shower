@@ -13,6 +13,7 @@ export interface Comment {
 export interface Post {
   id: string;
   roomId: string;
+  cohortId: string;  // 기수 ID 추가
   author: string;
   content: string;
   likes: number;
@@ -102,12 +103,13 @@ export const loadPosts = (roomId: string): Post[] => {
 };
 
 // 새 게시글 생성
-export const createPost = (roomId: string, content: string, recommendedQuote?: string): Post => {
+export const createPost = (roomId: string, cohortId: string, content: string, recommendedQuote?: string): Post => {
   const now = Date.now();
-  
+
   return {
     id: generateId(),
     roomId,
+    cohortId,
     author: generateAnonymousName(),
     content: content.trim(),
     likes: 0,
@@ -128,14 +130,14 @@ export const createPost = (roomId: string, content: string, recommendedQuote?: s
 };
 
 // 게시글 추가
-export const addPost = (roomId: string, content: string, recommendedQuote?: string): Post => {
+export const addPost = (roomId: string, cohortId: string, content: string, recommendedQuote?: string): Post => {
   const posts = loadPosts(roomId);
-  const newPost = createPost(roomId, content, recommendedQuote);
-  
+  const newPost = createPost(roomId, cohortId, content, recommendedQuote);
+
   // 최신 글이 맨 위로 오도록 앞에 추가
   const updatedPosts = [newPost, ...posts];
   savePosts(roomId, updatedPosts);
-  
+
   return newPost;
 };
 
@@ -244,7 +246,7 @@ export interface CohortStats {
   totalUsers: number;
   todayCompleted: number;
   todayCompletionRate: number;
-  eligibleFor22Days: number;
+  perfectStreakUsers: number;  // 연속 기록자 (현재까지 완벽하게 모든 DAY 완료)
   averageStamps: number;
   topUsers: Array<{
     rank: number;
@@ -254,7 +256,7 @@ export interface CohortStats {
   }>;
 }
 
-export const generateCohortStats = (cohortId: string, userStamps: number): CohortStats => {
+export const generateCohortStats = (cohortId: string, userStamps: number, currentDay: number): CohortStats => {
   // 시드값으로 일관된 랜덤 데이터 생성
   const seed = cohortId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number, offset: number = 0) => {
@@ -264,7 +266,12 @@ export const generateCohortStats = (cohortId: string, userStamps: number): Cohor
 
   const totalUsers = random(80, 150, 1);
   const todayCompleted = random(Math.floor(totalUsers * 0.5), Math.floor(totalUsers * 0.85), 2);
-  const eligibleFor22Days = random(Math.floor(totalUsers * 0.6), Math.floor(totalUsers * 0.9), 3);
+
+  // 연속 기록자: 현재 DAY만큼의 스탬프를 모두 가진 사람들
+  // 현재 DAY가 진행될수록 비율이 점점 줄어드는 것이 자연스러움
+  const perfectStreakRate = Math.max(0.3, 0.9 - (currentDay * 0.02)); // DAY가 증가할수록 감소
+  const perfectStreakUsers = Math.floor(totalUsers * perfectStreakRate);
+
   const averageStamps = random(10, 20, 4) + Math.random();
 
   // TOP 5 랭킹 생성 (사용자 포함)
@@ -303,7 +310,7 @@ export const generateCohortStats = (cohortId: string, userStamps: number): Cohor
     totalUsers,
     todayCompleted,
     todayCompletionRate: Math.round((todayCompleted / totalUsers) * 100),
-    eligibleFor22Days,
+    perfectStreakUsers,
     averageStamps: Math.round(averageStamps * 10) / 10,
     topUsers
   };
