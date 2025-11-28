@@ -22,19 +22,33 @@ import Apply from '@/pages/Apply';
 import Admin from '@/pages/Admin';
 import Onboarding from '@/pages/Onboarding';
 
+// Admin pages
+import AdminLogin from '@/pages/admin/AdminLogin';
+import AdminLayout from '@/components/admin/AdminLayout';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
+import UserManagement from '@/pages/admin/UserManagement';
+import CohortManagement from '@/pages/admin/CohortManagement';
+import ApplicationManagement from '@/pages/admin/ApplicationManagement';
+import Statistics from '@/pages/admin/Statistics';
+
 // Error pages
 import NotFound from '@/pages/NotFound';
 import Unauthorized from '@/pages/Unauthorized';
 import Waiting from '@/pages/Waiting';
 
+// Admin auth
+import { useAdminAuthStore } from '@/store/adminAuthStore';
+
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const { isLoggedIn, checkAuth } = useAuthStore();
+  const { isAdminLoggedIn, checkAdminAuth } = useAdminAuthStore();
 
   useEffect(() => {
     // Check auth status
     checkAuth();
+    checkAdminAuth();
 
     // For development: Clear onboarding state to test flow
     // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
@@ -78,8 +92,21 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
           <Route path="/apply" element={<Apply />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/onboarding" element={isLoggedIn ? <Onboarding /> : <Navigate to="/unauthorized" />} />
+
+          {/* Old Admin (for backward compatibility - will be removed) */}
+          <Route path="/admin" element={<Navigate to="/admin/login" />} />
+
+          {/* New Admin Routes */}
+          <Route path="/admin/login" element={!isAdminLoggedIn ? <AdminLogin /> : <Navigate to="/admin/dashboard" />} />
+          <Route path="/admin/*" element={isAdminLoggedIn ? <AdminLayout /> : <Navigate to="/admin/login" />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="cohorts" element={<CohortManagement />} />
+            <Route path="applications" element={<ApplicationManagement />} />
+            <Route path="statistics" element={<Statistics />} />
+            <Route index element={<Navigate to="/admin/dashboard" />} />
+          </Route>
 
           {/* Error/Info pages */}
           <Route path="/unauthorized" element={<Unauthorized />} />
