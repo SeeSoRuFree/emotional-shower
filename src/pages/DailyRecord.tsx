@@ -67,13 +67,11 @@ export default function DailyRecord() {
     }
 
     const day = calculateCurrentDay(cohortId);
-    console.log('📝 [DailyRecord] useEffect 실행:', { day, currentDay });
     setCurrentDay(day);
 
     // Check if already completed today
     const record = getTodayRecord(day);
     if (record?.isCompleted) {
-      console.log('⚠️ [DailyRecord] 이미 완료된 기록, 홈으로 리다이렉트');
       navigate('/home');
     }
   }, [userChallenge, cohortId, calculateCurrentDay, navigate, getTodayRecord]);
@@ -134,8 +132,6 @@ export default function DailyRecord() {
 
   const handleComplete = () => {
     if (!cohortId) return;
-
-    console.log('🎯 [DailyRecord] handleComplete 호출:', { currentDay, cohortId });
 
     // Store the day number BEFORE completing (to show correct day in completion screen)
     setCompletedDayNumber(currentDay);

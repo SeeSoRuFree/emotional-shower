@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   TrendingUp, Calendar, Heart, Award, Target,
   ChevronRight, LogOut, Settings as SettingsIcon,
-  Sparkles, CheckCircle2, BarChart3
+  Sparkles, CheckCircle2, BarChart3, Trash2, Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ResponsiveNav from '@/components/common/ResponsiveNav';
@@ -85,14 +85,20 @@ export default function Profile() {
     }
   };
 
-  const handleResetData = () => {
-    if (confirm('정말 모든 챌린지 데이터를 초기화하시겠어요? 이 작업은 되돌릴 수 없습니다.')) {
-      if (confirm('한 번 더 확인합니다. 정말로 진행하시겠어요?')) {
+  const handleDeleteAccount = () => {
+    if (confirm('⚠️ 정말 계정을 삭제하시겠어요?\n\n계정을 삭제하면 다음 데이터가 영구적으로 삭제됩니다:\n- 계정 정보 (이름, 이메일)\n- 챌린지 진행 기록\n- 일일 기록 데이터\n- 설문 응답\n- 커뮤니티 게시글/댓글\n\n이 작업은 되돌릴 수 없습니다.')) {
+      if (confirm('한 번 더 확인합니다. 정말로 계정을 삭제하시겠어요?')) {
+        // Remove all user data
+        localStorage.removeItem('kindness-users');
+        localStorage.removeItem('kindness-current-user');
         localStorage.removeItem('kindness-challenge');
         localStorage.removeItem('kindness-daily-records');
         localStorage.removeItem('kindness-surveys');
+        localStorage.removeItem('kindness-community-posts');
         localStorage.removeItem('hasCompletedOnboarding');
-        navigate('/onboarding');
+
+        alert('계정이 삭제되었습니다.');
+        navigate('/intro');
       }
     }
   };
@@ -116,36 +122,54 @@ export default function Profile() {
         </div>
 
         <div className="px-6 py-6 pb-32 space-y-4">
-          {/* Data Management */}
+          {/* Account Management */}
           <div className="bg-white rounded-3xl p-6 shadow-soft">
-            <h3 className="font-bold text-headspace-darkGray mb-4">데이터 관리</h3>
+            <h3 className="font-bold text-headspace-darkGray mb-4">계정 관리</h3>
 
             <div className="space-y-3">
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-between p-4 bg-headspace-pastel-yellow rounded-2xl hover:bg-yellow-100 transition-colors"
+                className="w-full flex items-center justify-between p-4 bg-headspace-pastel-blue rounded-2xl hover:bg-blue-100 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <LogOut className="w-5 h-5 text-headspace-yellow" />
+                  <LogOut className="w-5 h-5 text-headspace-blue" />
                   <span className="font-medium text-headspace-darkGray">로그아웃</span>
                 </div>
                 <ChevronRight className="w-5 h-5 text-headspace-textMuted" />
               </button>
 
               <button
-                onClick={handleResetData}
+                onClick={handleDeleteAccount}
                 className="w-full flex items-center justify-between p-4 bg-red-50 rounded-2xl hover:bg-red-100 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <SettingsIcon className="w-5 h-5 text-red-500" />
-                  <span className="font-medium text-headspace-darkGray">데이터 초기화</span>
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-headspace-darkGray">계정 삭제</p>
+                    <p className="text-xs text-red-600">모든 데이터가 영구적으로 삭제됩니다</p>
+                  </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-headspace-textMuted" />
               </button>
             </div>
           </div>
 
-          {/* Info */}
+          {/* App Info */}
+          <div className="bg-white rounded-3xl p-6 shadow-soft">
+            <h3 className="font-bold text-headspace-darkGray mb-4">앱 정보</h3>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 bg-headspace-pastel-purple rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <Info className="w-5 h-5 text-headspace-purple" />
+                  <span className="font-medium text-headspace-darkGray">버전</span>
+                </div>
+                <span className="text-sm font-mono text-headspace-textMuted">1.0.0</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Privacy Info */}
           <div className="bg-gradient-to-r from-headspace-pastel-blue to-headspace-pastel-purple rounded-3xl p-6 shadow-soft">
             <div className="flex items-start gap-3">
               <Sparkles className="w-5 h-5 text-headspace-purple flex-shrink-0 mt-1" />

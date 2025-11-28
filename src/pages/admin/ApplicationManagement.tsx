@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FileText, Check, X, Clock, Mail, Calendar, Copy } from 'lucide-react';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useCohortStore } from '@/store/cohortStore';

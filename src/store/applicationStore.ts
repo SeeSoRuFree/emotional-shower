@@ -55,7 +55,7 @@ const loadFromStorage = () => {
     const applicationsData = localStorage.getItem(STORAGE_KEY);
     const codesData = localStorage.getItem(CODE_STORAGE_KEY);
 
-    return {
+    const parsed = {
       applications: applicationsData ? JSON.parse(applicationsData).map((app: any) => ({
         ...app,
         appliedAt: new Date(app.appliedAt),
@@ -66,8 +66,10 @@ const loadFromStorage = () => {
         usedAt: code.usedAt ? new Date(code.usedAt) : null
       })) : []
     };
+
+    return parsed;
   } catch (error) {
-    console.error('Failed to load applications:', error);
+    console.error('Failed to load applications from storage:', error);
     return { applications: [], codeMappings: [] };
   }
 };
@@ -78,7 +80,7 @@ const saveToStorage = (applications: Application[], codeMappings: CodeMapping[])
     localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
     localStorage.setItem(CODE_STORAGE_KEY, JSON.stringify(codeMappings));
   } catch (error) {
-    console.error('Failed to save applications:', error);
+    console.error('Failed to save applications to storage:', error);
   }
 };
 
