@@ -82,7 +82,7 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
   ensureTestCohort: async () => {
     // 아직 로드하지 않았으면 로드
     if (!get().initialized) {
-      await loadCohorts();
+      await get().loadCohorts();
     }
 
     // 테스트 기수 찾기 (이름으로 식별)
