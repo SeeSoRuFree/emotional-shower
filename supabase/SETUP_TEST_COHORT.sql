@@ -13,16 +13,22 @@
 -- 5. "Run" 버튼 클릭
 -- ==========================================
 
--- Step 1: RLS 정책 수정 (anon 사용자도 cohorts 읽을 수 있게)
+-- Step 1: RLS 정책 수정
 -- ==========================================
 
--- 기존 정책 삭제
+-- 1-1. cohorts 테이블: anon 사용자도 읽을 수 있게
 DROP POLICY IF EXISTS "Anyone can view cohorts" ON cohorts;
 
--- 새 정책: anon과 authenticated 모두 SELECT 가능
 CREATE POLICY "Anyone can view cohorts"
   ON cohorts FOR SELECT
   USING (true);
+
+-- 1-2. users 테이블: 사용자가 자기 프로필을 생성할 수 있게 (INSERT 권한 추가)
+DROP POLICY IF EXISTS "Users can insert own profile" ON users;
+
+CREATE POLICY "Users can insert own profile"
+  ON users FOR INSERT
+  WITH CHECK (auth.uid() = id);
 
 -- Step 2: 테스트용 Cohort 생성
 -- ==========================================
