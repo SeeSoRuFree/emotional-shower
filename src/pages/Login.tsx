@@ -42,13 +42,13 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = login(formData.email, formData.password);
+    try {
+      const result = await login(formData.email, formData.password);
 
       if (!result.success) {
         setErrors({ password: result.error || '로그인에 실패했습니다' });
@@ -59,7 +59,11 @@ export default function Login() {
       // 로그인 성공 - Home으로 이동
       setIsLoading(false);
       navigate('/home');
-    }, 500);
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ password: '로그인 중 오류가 발생했습니다' });
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

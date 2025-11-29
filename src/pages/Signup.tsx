@@ -68,12 +68,12 @@ export default function Signup() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
       // 1. 코드 검증
       const codeResult = verifyCode(formData.code);
 
@@ -89,8 +89,8 @@ export default function Signup() {
         return;
       }
 
-      // 2. 회원가입
-      const signupResult = signup({
+      // 2. 회원가입 (Supabase Auth)
+      const signupResult = await signup({
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -117,7 +117,11 @@ export default function Signup() {
       // 6. Home으로 이동 (사전 설문 버튼 보임)
       setIsLoading(false);
       navigate('/home');
-    }, 500);
+    } catch (error) {
+      console.error('Signup error:', error);
+      setErrors({ email: '회원가입 중 오류가 발생했습니다' });
+      setIsLoading(false);
+    }
   };
 
   return (

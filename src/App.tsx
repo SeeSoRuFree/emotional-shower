@@ -46,25 +46,29 @@ function App() {
   const { isAdminLoggedIn, checkAdminAuth } = useAdminAuthStore();
 
   useEffect(() => {
-    // Check auth status
-    checkAuth();
-    checkAdminAuth();
+    // Check auth status (async)
+    const initAuth = async () => {
+      await checkAuth();
+      checkAdminAuth();
 
-    // For development: Clear onboarding state to test flow
-    // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
-    // localStorage.removeItem('hasCompletedOnboarding');
-    // localStorage.removeItem('isLoggedIn');
-    // localStorage.removeItem('loginMethod');
-    // localStorage.removeItem('kindness-challenge');
-    // localStorage.removeItem('kindness-daily-records');
-    // localStorage.removeItem('kindness-surveys');
-    // localStorage.removeItem('kindness-users');
-    // localStorage.removeItem('kindness-auth');
+      // For development: Clear onboarding state to test flow
+      // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
+      // localStorage.removeItem('hasCompletedOnboarding');
+      // localStorage.removeItem('isLoggedIn');
+      // localStorage.removeItem('loginMethod');
+      // localStorage.removeItem('kindness-challenge');
+      // localStorage.removeItem('kindness-daily-records');
+      // localStorage.removeItem('kindness-surveys');
+      // localStorage.removeItem('kindness-users');
+      // localStorage.removeItem('kindness-auth');
 
-    // Check if user has completed onboarding
-    const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
-    setHasCompletedOnboarding(!!completedOnboarding);
-  }, [checkAuth]);
+      // Check if user has completed onboarding
+      const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
+      setHasCompletedOnboarding(!!completedOnboarding);
+    };
+
+    initAuth();
+  }, [checkAuth, checkAdminAuth]);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
