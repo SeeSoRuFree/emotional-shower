@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
 
 // 행동 (자기돌봄 또는 타인친절)
 interface Action {
@@ -22,60 +23,96 @@ export interface DailyRecord {
 
 interface DailyRecordStore {
   records: DailyRecord[];
+  loading: boolean;
+  initialized: boolean;
 
   // Actions
+  loadRecords: () => Promise<void>;
   getTodayRecord: (day: number) => DailyRecord | undefined;
-  addSelfCareAction: (day: number, label: string, isCustom: boolean) => void;
-  addKindnessAction: (day: number, label: string, isCustom: boolean) => void;
+  addSelfCareAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
+  addKindnessAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
   updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => void;
   updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => void;
   removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => void;
-  completeRecord: (day: number, quote: string) => void;
+  completeRecord: (day: number, quote: string) => Promise<void>;
   getRecordByDay: (day: number) => DailyRecord | undefined;
   getTopActions: (type: 'selfCare' | 'kindness', limit?: number) => { label: string; count: number }[];
 }
-
-const STORAGE_KEY = 'kindness-daily-records';
-
-// LocalStorage 로드
-const loadFromStorage = (): DailyRecord[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const records = JSON.parse(stored);
-      return records.map((record: any) => ({
-        ...record,
-        selfCareActions: record.selfCareActions?.map((action: any) => ({
-          ...action,
-          timestamp: new Date(action.timestamp)
-        })) || [],
-        kindnessActions: record.kindnessActions?.map((action: any) => ({
-          ...action,
-          timestamp: new Date(action.timestamp)
-        })) || [],
-        completedAt: record.completedAt ? new Date(record.completedAt) : undefined
-      }));
-    }
-  } catch (error) {
-    console.error('Failed to load daily records:', error);
-  }
-  return [];
-};
-
-// LocalStorage 저장
-const saveToStorage = (records: DailyRecord[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch (error) {
-    console.error('Failed to save daily records:', error);
-  }
-};
 
 // Export Action type for external use
 export type { Action };
 
 export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
-  records: loadFromStorage(),
+  records: [],
+  loading: false,
+  initialized: false,
+
+  // Supabase에서 일일 기록 로드
+  loadRecords: async () => {
+    try {
+      set({ loading: true });
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        set({ records: [], loading: false, initialized: true });
+        return;
+      }
+
+      // 현재 사용자의 현재 cohort_id 가져오기
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) {
+        set({ records: [], loading: false, initialized: true });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('daily_records')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id)
+        .order('day', { ascending: true });
+
+      if (error) {
+        console.error('Failed to load daily records:', error);
+        set({ loading: false });
+        return;
+      }
+
+      const records: DailyRecord[] = (data || []).map(row => {
+        // JSONB에서 Action 배열 파싱 (timestamp를 Date로 변환)
+        const selfCareActions = (row.self_care_actions as any[] || []).map((action: any) => ({
+          ...action,
+          timestamp: new Date(action.timestamp)
+        }));
+
+        const kindnessActions = (row.kindness_actions as any[] || []).map((action: any) => ({
+          ...action,
+          timestamp: new Date(action.timestamp)
+        }));
+
+        return {
+          date: new Date(row.created_at).toISOString().split('T')[0],
+          day: row.day,
+          selfCareActions,
+          kindnessActions,
+          receivedQuote: row.quote || undefined,
+          isCompleted: row.is_completed,
+          completedAt: row.updated_at ? new Date(row.updated_at) : undefined
+        };
+      });
+
+      set({ records, loading: false, initialized: true });
+    } catch (error) {
+      console.error('Load daily records error:', error);
+      set({ loading: false });
+    }
+  },
 
   // 오늘(특정 DAY)의 기록 가져오기
   getTodayRecord: (day: number) => {
@@ -83,82 +120,185 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
   },
 
   // 자기돌봄 행동 추가
-  addSelfCareAction: (day: number, label: string, isCustom: boolean) => {
-    const { records } = get();
-    const today = new Date().toISOString().split('T')[0];
+  addSelfCareAction: async (day: number, label: string, isCustom: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    let record = records.find(r => r.day === day);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
 
-    if (!record) {
-      // 새 기록 생성
-      record = {
-        date: today,
-        day,
-        selfCareActions: [],
-        kindnessActions: [],
-        isCompleted: false
+      if (!userData?.current_cohort_id) return;
+
+      const cohortId = userData.current_cohort_id;
+      const { records } = get();
+      const today = new Date().toISOString().split('T')[0];
+
+      let record = records.find(r => r.day === day);
+
+      // 최대 10개 제한
+      if (record && record.selfCareActions.length >= 10) {
+        alert('자기돌봄 행동은 최대 10개까지 추가할 수 있습니다.');
+        return;
+      }
+
+      const newAction: Action = {
+        id: `self-${Date.now()}`,
+        label,
+        isCustom,
+        timestamp: new Date()
       };
-      records.push(record);
+
+      if (!record) {
+        // 새 기록 생성
+        const { data, error } = await supabase
+          .from('daily_records')
+          .insert({
+            user_id: user.id,
+            cohort_id: cohortId,
+            day,
+            self_care_actions: [newAction],
+            kindness_actions: [],
+            is_completed: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Failed to create daily record:', error);
+          return;
+        }
+
+        record = {
+          date: today,
+          day,
+          selfCareActions: [newAction],
+          kindnessActions: [],
+          isCompleted: false
+        };
+
+        set({ records: [...records, record] });
+      } else {
+        // 기존 기록 업데이트
+        const updatedSelfCare = [...record.selfCareActions, newAction];
+
+        const { error } = await supabase
+          .from('daily_records')
+          .update({
+            self_care_actions: updatedSelfCare
+          })
+          .eq('user_id', user.id)
+          .eq('cohort_id', cohortId)
+          .eq('day', day);
+
+        if (error) {
+          console.error('Failed to update self care actions:', error);
+          return;
+        }
+
+        const updatedRecords = records.map(r =>
+          r.day === day ? { ...r, selfCareActions: updatedSelfCare } : r
+        );
+
+        set({ records: updatedRecords });
+      }
+    } catch (error) {
+      console.error('Add self care action error:', error);
     }
-
-    // 최대 10개 제한
-    if (record.selfCareActions.length >= 10) {
-      alert('자기돌봄 행동은 최대 10개까지 추가할 수 있습니다.');
-      return;
-    }
-
-    const newAction: Action = {
-      id: `self-${Date.now()}`,
-      label,
-      isCustom,
-      timestamp: new Date()
-    };
-
-    record.selfCareActions.push(newAction);
-
-    const updatedRecords = records.map(r => r.day === day ? record : r) as DailyRecord[];
-    set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
   // 타인친절 행동 추가
-  addKindnessAction: (day: number, label: string, isCustom: boolean) => {
-    const { records } = get();
-    const today = new Date().toISOString().split('T')[0];
+  addKindnessAction: async (day: number, label: string, isCustom: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    let record = records.find(r => r.day === day);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
 
-    if (!record) {
-      record = {
-        date: today,
-        day,
-        selfCareActions: [],
-        kindnessActions: [],
-        isCompleted: false
+      if (!userData?.current_cohort_id) return;
+
+      const cohortId = userData.current_cohort_id;
+      const { records } = get();
+      const today = new Date().toISOString().split('T')[0];
+
+      let record = records.find(r => r.day === day);
+
+      if (record && record.kindnessActions.length >= 10) {
+        alert('타인친절 행동은 최대 10개까지 추가할 수 있습니다.');
+        return;
+      }
+
+      const newAction: Action = {
+        id: `kind-${Date.now()}`,
+        label,
+        isCustom,
+        timestamp: new Date()
       };
-      records.push(record);
+
+      if (!record) {
+        const { data, error } = await supabase
+          .from('daily_records')
+          .insert({
+            user_id: user.id,
+            cohort_id: cohortId,
+            day,
+            self_care_actions: [],
+            kindness_actions: [newAction],
+            is_completed: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Failed to create daily record:', error);
+          return;
+        }
+
+        record = {
+          date: today,
+          day,
+          selfCareActions: [],
+          kindnessActions: [newAction],
+          isCompleted: false
+        };
+
+        set({ records: [...records, record] });
+      } else {
+        const updatedKindness = [...record.kindnessActions, newAction];
+
+        const { error } = await supabase
+          .from('daily_records')
+          .update({
+            kindness_actions: updatedKindness
+          })
+          .eq('user_id', user.id)
+          .eq('cohort_id', cohortId)
+          .eq('day', day);
+
+        if (error) {
+          console.error('Failed to update kindness actions:', error);
+          return;
+        }
+
+        const updatedRecords = records.map(r =>
+          r.day === day ? { ...r, kindnessActions: updatedKindness } : r
+        );
+
+        set({ records: updatedRecords });
+      }
+    } catch (error) {
+      console.error('Add kindness action error:', error);
     }
-
-    if (record.kindnessActions.length >= 10) {
-      alert('타인친절 행동은 최대 10개까지 추가할 수 있습니다.');
-      return;
-    }
-
-    const newAction: Action = {
-      id: `kind-${Date.now()}`,
-      label,
-      isCustom,
-      timestamp: new Date()
-    };
-
-    record.kindnessActions.push(newAction);
-
-    const updatedRecords = records.map(r => r.day === day ? record : r) as DailyRecord[];
-    set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
-  // 행동에 메모 추가/수정
+  // 행동에 메모 추가/수정 (동기 - 로컬 상태만 업데이트)
   updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => {
     const { records } = get();
     const record = records.find(r => r.day === day);
@@ -172,10 +312,9 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
 
     const updatedRecords = [...records];
     set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
-  // 행동 전체 업데이트 (제목 + 메모)
+  // 행동 전체 업데이트 (제목 + 메모) (동기 - 로컬 상태만 업데이트)
   updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => {
     const { records } = get();
     const record = records.find(r => r.day === day);
@@ -190,10 +329,9 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
 
     const updatedRecords = [...records];
     set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
-  // 행동 삭제
+  // 행동 삭제 (동기 - 로컬 상태만 업데이트)
   removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => {
     const { records } = get();
     const record = records.find(r => r.day === day);
@@ -207,28 +345,58 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
 
     const updatedRecords = [...records];
     set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
   // 기록 완료 (스탬프 획득)
-  completeRecord: (day: number, quote: string) => {
-    const { records } = get();
-    const record = records.find(r => r.day === day);
-    if (!record) return;
+  completeRecord: async (day: number, quote: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    // Q1, Q2 모두 최소 1개 이상 있어야 완료 가능
-    if (record.selfCareActions.length === 0 || record.kindnessActions.length === 0) {
-      alert('자기돌봄과 타인친절 행동을 각각 최소 1개 이상 기록해주세요.');
-      return;
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const cohortId = userData.current_cohort_id;
+      const { records } = get();
+      const record = records.find(r => r.day === day);
+      if (!record) return;
+
+      // Q1, Q2 모두 최소 1개 이상 있어야 완료 가능
+      if (record.selfCareActions.length === 0 || record.kindnessActions.length === 0) {
+        alert('자기돌봄과 타인친절 행동을 각각 최소 1개 이상 기록해주세요.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('daily_records')
+        .update({
+          is_completed: true,
+          quote: quote
+        })
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId)
+        .eq('day', day);
+
+      if (error) {
+        console.error('Failed to complete record:', error);
+        return;
+      }
+
+      const updatedRecords = records.map(r =>
+        r.day === day
+          ? { ...r, isCompleted: true, receivedQuote: quote, completedAt: new Date() }
+          : r
+      );
+
+      set({ records: updatedRecords });
+    } catch (error) {
+      console.error('Complete record error:', error);
     }
-
-    record.isCompleted = true;
-    record.receivedQuote = quote;
-    record.completedAt = new Date();
-
-    const updatedRecords = [...records];
-    set({ records: updatedRecords });
-    saveToStorage(updatedRecords);
   },
 
   // 특정 DAY 기록 가져오기

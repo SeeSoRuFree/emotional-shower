@@ -51,7 +51,7 @@ export default function Home() {
   } = useChallengeStore();
 
   const { getCohortById } = useCohortStore();
-  const { getTodayRecord } = useDailyRecordStore();
+  const { getTodayRecord, loadRecords, initialized: recordsInitialized } = useDailyRecordStore();
   const { preSurvey, postSurvey } = useSurveyStore();
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
@@ -66,6 +66,13 @@ export default function Home() {
       loadChallenges();
     }
   }, [initialized, loadChallenges]);
+
+  // Load daily records on mount
+  useEffect(() => {
+    if (!recordsInitialized) {
+      loadRecords();
+    }
+  }, [recordsInitialized, loadRecords]);
 
   useEffect(() => {
     if (userChallenge && cohortId) {

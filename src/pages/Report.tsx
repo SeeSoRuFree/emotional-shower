@@ -22,7 +22,14 @@ export default function Report() {
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
   const currentCohort = cohortId ? getCohortById(cohortId) : undefined;
   const { preSurvey, postSurvey, calculateScores } = useSurveyStore();
-  const { records } = useDailyRecordStore();
+  const { records, loadRecords, initialized } = useDailyRecordStore();
+
+  // Load daily records on mount
+  useEffect(() => {
+    if (!initialized) {
+      loadRecords();
+    }
+  }, [initialized, loadRecords]);
 
   useEffect(() => {
     // Check if user can access report

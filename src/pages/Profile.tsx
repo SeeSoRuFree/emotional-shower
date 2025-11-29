@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, Calendar, Heart, Award, Target,
@@ -20,9 +20,16 @@ export default function Profile() {
 
   const { getCurrentChallenge, calculateCurrentDay, canAccessReport } = useChallengeStore();
   const { getCohortById } = useCohortStore();
-  const { records } = useDailyRecordStore();
+  const { records, loadRecords, initialized } = useDailyRecordStore();
   const { preSurvey } = useSurveyStore();
   const [showSettings, setShowSettings] = useState(false);
+
+  // Load daily records on mount
+  useEffect(() => {
+    if (!initialized) {
+      loadRecords();
+    }
+  }, [initialized, loadRecords]);
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
   const currentCohort = cohortId ? getCohortById(cohortId) : null;
@@ -85,19 +92,15 @@ export default function Profile() {
     }
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (confirm('⚠️ 정말 계정을 삭제하시겠어요?\n\n계정을 삭제하면 다음 데이터가 영구적으로 삭제됩니다:\n- 계정 정보 (이름, 이메일)\n- 챌린지 진행 기록\n- 일일 기록 데이터\n- 설문 응답\n- 커뮤니티 게시글/댓글\n\n이 작업은 되돌릴 수 없습니다.')) {
       if (confirm('한 번 더 확인합니다. 정말로 계정을 삭제하시겠어요?')) {
-        // Remove all user data
-        localStorage.removeItem('kindness-users');
-        localStorage.removeItem('kindness-current-user');
-        localStorage.removeItem('kindness-challenge');
-        localStorage.removeItem('kindness-daily-records');
-        localStorage.removeItem('kindness-surveys');
-        localStorage.removeItem('kindness-community-posts');
-        localStorage.removeItem('hasCompletedOnboarding');
+        // TODO: Implement Supabase account deletion
+        // This will need to delete user data from all tables via RLS or admin API
+        alert('계정 삭제 기능은 추후 구현될 예정입니다.');
 
-        alert('계정이 삭제되었습니다.');
+        // For now, just logout
+        logout();
         navigate('/intro');
       }
     }
@@ -176,8 +179,8 @@ export default function Profile() {
               <div>
                 <h3 className="font-bold text-headspace-darkGray mb-2">안전한 데이터 보관</h3>
                 <p className="text-sm text-headspace-textMuted leading-relaxed">
-                  모든 데이터는 브라우저 로컬 스토리지에만 저장되며, 외부 서버로 전송되지 않습니다.
-                  브라우저 데이터를 삭제하면 기록도 함께 사라지니 주의해주세요.
+                  모든 데이터는 안전한 클라우드 데이터베이스에 암호화되어 저장되며,
+                  행 레벨 보안(RLS)으로 보호됩니다. 연구 목적 외에는 사용되지 않습니다.
                 </p>
               </div>
             </div>

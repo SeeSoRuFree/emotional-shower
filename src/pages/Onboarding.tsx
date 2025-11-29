@@ -180,9 +180,9 @@ export default function Onboarding() {
                       🔒 개인정보 보호
                     </h3>
                     <p>
-                      모든 데이터는 <strong>로컬스토리지</strong>에 저장되며,
-                      개인을 식별할 수 있는 정보는 수집하지 않습니다.
-                      참여자는 <strong>익명</strong>으로 처리됩니다.
+                      모든 데이터는 <strong>안전한 클라우드 데이터베이스</strong>에 암호화되어 저장되며,
+                      연구 목적 외에는 사용되지 않습니다.
+                      개인정보는 철저히 보호됩니다.
                     </p>
 
                     <h3 className="font-semibold text-headspace-darkGray mb-2 mt-4">

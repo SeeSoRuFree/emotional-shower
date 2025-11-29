@@ -31,7 +31,9 @@ export default function DailyRecord() {
     updateActionMemo,
     updateAction,
     removeAction,
-    completeRecord
+    completeRecord,
+    loadRecords,
+    initialized
   } = useDailyRecordStore();
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
@@ -60,6 +62,13 @@ export default function DailyRecord() {
   const selfCareActions = todayRecord?.selfCareActions || [];
   const kindnessActions = todayRecord?.kindnessActions || [];
 
+  // Load daily records on mount
+  useEffect(() => {
+    if (!initialized) {
+      loadRecords();
+    }
+  }, [initialized, loadRecords]);
+
   useEffect(() => {
     if (!userChallenge || !cohortId) {
       navigate('/home');
@@ -76,12 +85,12 @@ export default function DailyRecord() {
     }
   }, [userChallenge, cohortId, calculateCurrentDay, navigate, getTodayRecord]);
 
-  const handleAddSelfCare = (label: string, isCustom: boolean) => {
-    addSelfCareAction(currentDay, label, isCustom);
+  const handleAddSelfCare = async (label: string, isCustom: boolean) => {
+    await addSelfCareAction(currentDay, label, isCustom);
   };
 
-  const handleAddKindness = (label: string, isCustom: boolean) => {
-    addKindnessAction(currentDay, label, isCustom);
+  const handleAddKindness = async (label: string, isCustom: boolean) => {
+    await addKindnessAction(currentDay, label, isCustom);
   };
 
   const handleRemoveAction = (type: 'selfCare' | 'kindness', actionId: string) => {
@@ -137,7 +146,7 @@ export default function DailyRecord() {
     setCompletedDayNumber(currentDay);
 
     // Complete record with quote
-    completeRecord(currentDay, selectedQuote);
+    await completeRecord(currentDay, selectedQuote);
 
     // Mark day as completed in challenge
     await completeDay(cohortId, currentDay);
