@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useCohortStore } from './cohortStore';
 
 // 신청자 정보
 export interface Application {
@@ -30,7 +31,7 @@ interface ApplicationStore {
   submitApplication: (data: { name: string; email: string; motivation: string }) => void;
   approveApplication: (applicationId: string, cohortId: string) => string;  // Returns code
   rejectApplication: (applicationId: string) => void;
-  verifyCode: (code: string) => { valid: boolean; cohortId?: string; applicationId?: string };
+  verifyCode: (code: string) => Promise<{ valid: boolean; cohortId?: string; applicationId?: string }>;
   markCodeAsUsed: (code: string) => void;
   getApplicationsByStatus: (status: Application['status']) => Application[];
   getApplicationsByCohort: (cohortId: string) => Application[];
@@ -88,10 +89,11 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => {
   const { applications: storedApps, codeMappings: storedCodes } = loadFromStorage();
 
   // 초기화: 테스트용 코드가 없으면 생성
+  // Note: cohortId는 임시값. verifyCode 시 실제 UUID로 교체됨
   if (!storedCodes.some(code => code.code === 'TEST01')) {
     const testCodeMapping: CodeMapping = {
       code: 'TEST01',
-      cohortId: 'cohort-1',
+      cohortId: 'TEMP_WILL_BE_REPLACED', // Placeholder
       applicationId: 'test-application',
       isUsed: false,
       usedAt: null
@@ -193,7 +195,7 @@ Subject: [정서샤워] 챌린지 승인 안내
     },
 
     // 코드 검증
-    verifyCode: (code) => {
+    verifyCode: async (code) => {
       const mapping = get().codeMappings.find(m => m.code === code.toUpperCase());
 
       if (!mapping) {
@@ -204,9 +206,30 @@ Subject: [정서샤워] 챌린지 승인 안내
         return { valid: false };
       }
 
+      // TEST01 코드의 경우, cohortStore에서 실제 UUID 가져오기
+      let actualCohortId = mapping.cohortId;
+      if (code.toUpperCase() === 'TEST01') {
+        try {
+          const cohortStore = useCohortStore.getState();
+          actualCohortId = await cohortStore.ensureTestCohort();
+
+          // 실제 UUID로 매핑 업데이트
+          const updatedMappings = get().codeMappings.map(m =>
+            m.code === 'TEST01'
+              ? { ...m, cohortId: actualCohortId }
+              : m
+          );
+          set({ codeMappings: updatedMappings });
+          saveToStorage(get().applications, updatedMappings);
+        } catch (error) {
+          console.error('Failed to get test cohort UUID:', error);
+          return { valid: false };
+        }
+      }
+
       return {
         valid: true,
-        cohortId: mapping.cohortId,
+        cohortId: actualCohortId,
         applicationId: mapping.applicationId
       };
     },

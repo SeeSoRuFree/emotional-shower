@@ -74,8 +74,8 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      // 1. 코드 검증
-      const codeResult = verifyCode(formData.code);
+      // 1. 코드 검증 (async - cohortStore에서 실제 UUID 가져옴)
+      const codeResult = await verifyCode(formData.code);
 
       if (!codeResult.valid) {
         setErrors({ code: '유효하지 않거나 이미 사용된 코드입니다' });
