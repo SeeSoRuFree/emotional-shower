@@ -8,6 +8,7 @@ import PostDetail from '@/components/community/PostDetail';
 import Profile from '@/pages/Profile';
 import { Toaster } from '@/components/ui/toaster';
 import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/lib/supabase';
 
 // Challenge pages
 import DailyRecord from '@/pages/DailyRecord';
@@ -42,33 +43,69 @@ import { useAdminAuthStore } from '@/store/adminAuthStore';
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const { isLoggedIn, checkAuth } = useAuthStore();
   const { isAdminLoggedIn, checkAdminAuth } = useAdminAuthStore();
 
   useEffect(() => {
     // Check auth status (async)
     const initAuth = async () => {
-      await checkAuth();
-      checkAdminAuth();
+      setIsInitializing(true);
+      try {
+        await checkAuth();
+        checkAdminAuth();
 
-      // For development: Clear onboarding state to test flow
-      // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
-      // localStorage.removeItem('hasCompletedOnboarding');
-      // localStorage.removeItem('isLoggedIn');
-      // localStorage.removeItem('loginMethod');
-      // localStorage.removeItem('kindness-challenge');
-      // localStorage.removeItem('kindness-daily-records');
-      // localStorage.removeItem('kindness-surveys');
-      // localStorage.removeItem('kindness-users');
-      // localStorage.removeItem('kindness-auth');
+        // For development: Clear onboarding state to test flow
+        // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
+        // localStorage.removeItem('hasCompletedOnboarding');
+        // localStorage.removeItem('isLoggedIn');
+        // localStorage.removeItem('loginMethod');
+        // localStorage.removeItem('kindness-challenge');
+        // localStorage.removeItem('kindness-daily-records');
+        // localStorage.removeItem('kindness-surveys');
+        // localStorage.removeItem('kindness-users');
+        // localStorage.removeItem('kindness-auth');
 
-      // Check if user has completed onboarding
-      const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
-      setHasCompletedOnboarding(!!completedOnboarding);
+        // Check if user has completed onboarding
+        const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
+        setHasCompletedOnboarding(!!completedOnboarding);
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setIsInitializing(false);
+      }
     };
 
     initAuth();
   }, [checkAuth, checkAdminAuth]);
+
+  // Listen for auth state changes (session refresh, logout, etc.)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event);
+
+        if (event === 'SIGNED_OUT') {
+          // User signed out - could be from another tab or session expiry
+          // The authStore logout will handle state cleanup
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Session token was refreshed successfully
+          console.log('Session token refreshed');
+        } else if (event === 'USER_UPDATED') {
+          // User data was updated
+          await checkAuth();
+        } else if (event === 'SIGNED_IN') {
+          // User signed in (could be from another tab)
+          await checkAuth();
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [checkAuth]);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -76,6 +113,18 @@ function App() {
 
   if (showSplash) {
     return <Splash onComplete={handleSplashComplete} />;
+  }
+
+  // Show loading while checking auth
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-headspace-blue mx-auto mb-4"></div>
+          <p className="text-headspace-textMuted">로딩 중...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

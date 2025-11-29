@@ -94,8 +94,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         });
 
       if (profileError) {
+        console.error('Profile creation error:', profileError);
         set({ loading: false });
-        return { success: false, error: '프로필 생성에 실패했습니다' };
+        // Note: Auth user was created but profile failed.
+        // User should contact support or try logging in again.
+        return {
+          success: false,
+          error: '프로필 생성에 실패했습니다. 이미 가입이 완료되었을 수 있습니다. 로그인을 시도해보세요.'
+        };
       }
 
       // 3. user_cohorts에 참여 기록 추가
@@ -108,8 +114,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         });
 
       if (cohortError) {
+        console.error('Cohort enrollment error:', cohortError);
         set({ loading: false });
-        return { success: false, error: '기수 참여 등록에 실패했습니다' };
+        // Profile exists but cohort enrollment failed
+        // User can still log in, but should contact support
+        return {
+          success: false,
+          error: '기수 참여 등록에 실패했습니다. 계정은 생성되었으니 로그인 후 다시 시도해주세요.'
+        };
       }
 
       // 4. user_cohorts 조회 (cohortHistory)
