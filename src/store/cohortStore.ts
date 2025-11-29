@@ -78,10 +78,8 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
     }
   },
 
-  // 테스트용 기수가 있는지 확인하고 없으면 생성
+  // 테스트용 기수가 있는지 확인 (생성은 하지 않음)
   ensureTestCohort: async () => {
-    const { cohorts, loadCohorts } = get();
-
     // 아직 로드하지 않았으면 로드
     if (!get().initialized) {
       await loadCohorts();
@@ -94,42 +92,10 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
       return testCohort.id;
     }
 
-    // 없으면 생성
-    console.log('Creating test cohort...');
-    const { data, error } = await supabase
-      .from('cohorts')
-      .insert({
-        name: '1기 (테스트)',
-        start_date: '2026-01-01',
-        end_date: '2026-01-30',
-        status: 'recruiting',
-        description: '테스트용 기수입니다',
-        record_type: 'both'
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Failed to create test cohort:', error);
-      throw error;
-    }
-
-    // 생성된 cohort를 store에 추가
-    const newCohort: Cohort = {
-      id: data.id,
-      name: data.name,
-      startDate: new Date(data.start_date),
-      endDate: new Date(data.end_date),
-      status: data.status,
-      description: data.description || undefined,
-      maxParticipants: data.max_participants || undefined,
-      recordType: data.record_type,
-      createdAt: new Date(data.created_at)
-    };
-
-    set({ cohorts: [...get().cohorts, newCohort] });
-
-    return data.id;
+    // 없으면 에러 (관리자가 수동으로 생성해야 함)
+    throw new Error(
+      '테스트용 기수가 없습니다. Supabase Dashboard에서 "1기 (테스트)" cohort를 생성해주세요.'
+    );
   },
 
   // 기수 생성
