@@ -42,8 +42,9 @@ export default function Home() {
   const cohortId = currentUser?.currentCohortId;
 
   const {
+    loadChallenges,
+    initialized,
     getCurrentChallenge,
-    approveChallenge,
     canStartPreSurvey,
     calculateCurrentDay,
     canAccessReport
@@ -58,6 +59,13 @@ export default function Home() {
 
   const [currentDay, setCurrentDay] = useState(0);
   const [todayCompleted, setTodayCompleted] = useState(false);
+
+  // Load challenges on mount
+  useEffect(() => {
+    if (!initialized) {
+      loadChallenges();
+    }
+  }, [initialized, loadChallenges]);
 
   useEffect(() => {
     if (userChallenge && cohortId) {

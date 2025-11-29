@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useSurveyStore, SURVEY_QUESTIONS } from '@/store/surveyStore';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
 
 // Likert Scale Component
 const LikertScale = ({ value, onChange }: { value: number; onChange: (value: number) => void }) => {
@@ -49,8 +50,13 @@ const LikertScale = ({ value, onChange }: { value: number; onChange: (value: num
 
 export default function PostSurvey() {
   const navigate = useNavigate();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
   const { submitPostSurvey } = useSurveyStore();
-  const { userChallenge, completeChallenge } = useChallengeStore();
+  const { getCurrentChallenge, completeChallenge } = useChallengeStore();
+
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, number>>({});
@@ -95,12 +101,14 @@ export default function PostSurvey() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    if (!cohortId) return;
+
     // Save post-survey
     submitPostSurvey(responses);
 
     // Mark challenge as completed
-    completeChallenge();
+    await completeChallenge(cohortId);
 
     // Navigate to report
     navigate('/report');

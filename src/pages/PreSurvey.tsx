@@ -150,7 +150,7 @@ export default function PreSurvey() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!cohortId) return;
 
     // Convert answers to SurveyResponse format
@@ -160,10 +160,10 @@ export default function PreSurvey() {
     }));
 
     submitPreSurvey(surveyResponses);
-    startChallenge(cohortId);
+    await startChallenge(cohortId);
 
     // 사전 설문 = DAY 1 완료 처리
-    completeDay(cohortId, 1);
+    await completeDay(cohortId, 1);
 
     localStorage.removeItem('pre-survey-progress');
 

@@ -2,13 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Heart, Calendar, FileText, Users } from 'lucide-react';
-import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
+import { useCohortStore } from '@/store/cohortStore';
 
 type OnboardingStep = 'welcome' | 'intro' | 'consent';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { currentCohort } = useChallengeStore();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { getCohortById } = useCohortStore();
+  const currentCohort = cohortId ? getCohortById(cohortId) : undefined;
 
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [agreed, setAgreed] = useState(false);

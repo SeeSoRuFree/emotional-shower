@@ -130,7 +130,7 @@ export default function DailyRecord() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!cohortId) return;
 
     // Store the day number BEFORE completing (to show correct day in completion screen)
@@ -140,7 +140,7 @@ export default function DailyRecord() {
     completeRecord(currentDay, selectedQuote);
 
     // Mark day as completed in challenge
-    completeDay(cohortId, currentDay);
+    await completeDay(cohortId, currentDay);
 
     // Show completed state briefly
     setStep('completed');

@@ -13,7 +13,6 @@ export default function CodeVerify() {
   const [isLoading, setIsLoading] = useState(false);
 
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
-  const { applyChallenge } = useChallengeStore();
 
   const handleVerify = () => {
     if (code.length !== 6) {
@@ -25,11 +24,17 @@ export default function CodeVerify() {
     setError('');
 
     // 코드 검증
-    setTimeout(() => {
-      const result = verifyCode(code);
+    setTimeout(async () => {
+      const result = await verifyCode(code);
 
       if (!result.valid) {
         setError('유효하지 않거나 이미 사용된 코드입니다');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!result.cohortId) {
+        setError('코드에 연결된 기수 정보가 없습니다');
         setIsLoading(false);
         return;
       }
@@ -38,12 +43,9 @@ export default function CodeVerify() {
       markCodeAsUsed(code);
 
       // 챌린지 자동 신청 (approved 상태로)
-      if (result.cohortId) {
-        applyChallenge(result.cohortId);
-        // 승인 완료 상태로 설정 (사전 설문 대기)
-        const challengeStore = useChallengeStore.getState();
-        challengeStore.approveChallenge();
-      }
+      const challengeStore = useChallengeStore.getState();
+      await challengeStore.applyChallenge(result.cohortId);
+      await challengeStore.approveChallenge(result.cohortId);
 
       // 온보딩 완료 처리
       localStorage.setItem('hasCompletedOnboarding', 'true');

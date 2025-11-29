@@ -8,19 +8,28 @@ import {
 import { useChallengeStore } from '@/store/challengeStore';
 import { useSurveyStore } from '@/store/surveyStore';
 import { useDailyRecordStore } from '@/store/dailyRecordStore';
+import { useAuthStore } from '@/store/authStore';
+import { useCohortStore } from '@/store/cohortStore';
 
 export default function Report() {
   const navigate = useNavigate();
-  const { userChallenge, currentCohort, canAccessReport } = useChallengeStore();
+  const { currentUser } = useAuthStore();
+  const cohortId = currentUser?.currentCohortId;
+
+  const { getCurrentChallenge, canAccessReport } = useChallengeStore();
+  const { getCohortById } = useCohortStore();
+
+  const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
+  const currentCohort = cohortId ? getCohortById(cohortId) : undefined;
   const { preSurvey, postSurvey, calculateScores } = useSurveyStore();
   const { records } = useDailyRecordStore();
 
   useEffect(() => {
     // Check if user can access report
-    if (!canAccessReport() || !postSurvey) {
+    if (!cohortId || !canAccessReport(cohortId) || !postSurvey) {
       navigate('/home');
     }
-  }, [canAccessReport, postSurvey, navigate]);
+  }, [cohortId, canAccessReport, postSurvey, navigate]);
 
   if (!preSurvey || !postSurvey || !userChallenge) {
     return null;

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
 
 // 사용자 챌린지 상태 (기수별)
 export interface UserChallenge {
@@ -13,91 +14,143 @@ export interface UserChallenge {
 
 interface ChallengeStore {
   challenges: UserChallenge[];  // 여러 기수의 챌린지 관리
+  loading: boolean;
+  initialized: boolean;
 
   // Actions
-  applyChallenge: (cohortId: string) => void;  // 신청 (waiting 상태)
-  approveChallenge: (cohortId: string) => void;                 // 승인 (approved 상태)
-  startChallenge: (cohortId: string) => void;                   // 챌린지 시작 (active 상태)
-  completeDay: (cohortId: string, day: number) => void;
-  completeChallenge: (cohortId: string) => void;
+  loadChallenges: () => Promise<void>;
+  applyChallenge: (cohortId: string) => Promise<void>;  // 신청 (waiting 상태)
+  approveChallenge: (cohortId: string) => Promise<void>;                 // 승인 (approved 상태)
+  startChallenge: (cohortId: string) => Promise<void>;                   // 챌린지 시작 (active 상태)
+  completeDay: (cohortId: string, day: number) => Promise<void>;
+  completeChallenge: (cohortId: string) => Promise<void>;
   calculateCurrentDay: (cohortId: string) => number;
   canStartPreSurvey: (cohortId: string) => boolean;             // 사전 설문 가능 여부
   canAccessReport: (cohortId: string) => boolean;
   getCurrentChallenge: (cohortId: string) => UserChallenge | undefined;  // 특정 기수 챌린지 조회
-  resetChallenge: (cohortId: string) => void;
+  resetChallenge: (cohortId: string) => Promise<void>;
 }
 
-// LocalStorage 키
-const STORAGE_KEY = 'kindness-daily-records';
+export const useChallengeStore = create<ChallengeStore>((set, get) => ({
+  challenges: [],
+  loading: false,
+  initialized: false,
 
-// LocalStorage에서 저장된 데이터 로드
-const loadFromStorage = (): UserChallenge[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((challenge: any) => ({
-        ...challenge,
-        appliedAt: challenge.appliedAt ? new Date(challenge.appliedAt) : null,
-        approvedAt: challenge.approvedAt ? new Date(challenge.approvedAt) : null,
-        startedAt: challenge.startedAt ? new Date(challenge.startedAt) : null,
-        completedAt: challenge.completedAt ? new Date(challenge.completedAt) : null
+  // Supabase에서 사용자의 챌린지 목록 로드
+  loadChallenges: async () => {
+    try {
+      set({ loading: true });
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        set({ challenges: [], loading: false, initialized: true });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('challenges')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('applied_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load challenges:', error);
+        set({ loading: false });
+        return;
+      }
+
+      const challenges: UserChallenge[] = (data || []).map(row => ({
+        cohortId: row.cohort_id,
+        completedDays: row.completed_days || [],
+        status: row.status,
+        appliedAt: row.applied_at ? new Date(row.applied_at) : null,
+        approvedAt: row.approved_at ? new Date(row.approved_at) : null,
+        startedAt: row.started_at ? new Date(row.started_at) : null,
+        completedAt: row.completed_at ? new Date(row.completed_at) : null
       }));
+
+      set({ challenges, loading: false, initialized: true });
+    } catch (error) {
+      console.error('Load challenges error:', error);
+      set({ loading: false });
     }
-  } catch (error) {
-    console.error('Failed to load challenges:', error);
-  }
-  return [];
-};
+  },
 
-// LocalStorage에 저장
-const saveToStorage = (challenges: UserChallenge[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(challenges));
-  } catch (error) {
-    console.error('Failed to save challenges:', error);
-  }
-};
+  // 챌린지 신청 (온보딩 완료 후)
+  applyChallenge: async (cohortId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
 
-export const useChallengeStore = create<ChallengeStore>((set, get) => {
-  const storedChallenges = loadFromStorage();
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
 
-  // 초기화: 테스트용 챌린지가 없으면 생성 (cohort-1에 대한 active 챌린지)
-  if (!storedChallenges.some(c => c.cohortId === 'cohort-1')) {
-    const testChallenge: UserChallenge = {
-      cohortId: 'cohort-1',
-      completedDays: [],
-      status: 'active',
-      appliedAt: new Date(),
-      approvedAt: new Date(),
-      startedAt: new Date(),
-      completedAt: null
-    };
-    storedChallenges.push(testChallenge);
-    saveToStorage(storedChallenges);
-  }
+      // Check if challenge already exists
+      const existing = get().challenges.find(c => c.cohortId === cohortId);
+      if (existing) {
+        console.log('Challenge already exists for this cohort');
+        return;
+      }
 
-  return {
-    challenges: storedChallenges,
+      const { data, error } = await supabase
+        .from('challenges')
+        .insert({
+          user_id: user.id,
+          cohort_id: cohortId,
+          status: 'waiting',
+          completed_days: []
+        })
+        .select()
+        .single();
 
-    // 챌린지 신청 (온보딩 완료 후)
-    applyChallenge: (cohortId) => {
+      if (error) {
+        console.error('Failed to apply challenge:', error);
+        return;
+      }
+
       const newChallenge: UserChallenge = {
-        cohortId,
-        completedDays: [],
-        status: 'waiting',
-        appliedAt: new Date(),
-        approvedAt: null,
-        startedAt: null,
-        completedAt: null
+        cohortId: data.cohort_id,
+        completedDays: data.completed_days || [],
+        status: data.status,
+        appliedAt: data.applied_at ? new Date(data.applied_at) : null,
+        approvedAt: data.approved_at ? new Date(data.approved_at) : null,
+        startedAt: data.started_at ? new Date(data.started_at) : null,
+        completedAt: data.completed_at ? new Date(data.completed_at) : null
       };
 
-      const challenges = [...get().challenges, newChallenge];
-      set({ challenges });
-      saveToStorage(challenges);
-    },
+      set({ challenges: [...get().challenges, newChallenge] });
+    } catch (error) {
+      console.error('Apply challenge error:', error);
+    }
+  },
 
-    // 챌린지 승인 (코드 인증 후)
-    approveChallenge: (cohortId) => {
+  // 챌린지 승인 (코드 인증 후)
+  approveChallenge: async (cohortId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('challenges')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId)
+        .eq('status', 'waiting');
+
+      if (error) {
+        console.error('Failed to approve challenge:', error);
+        return;
+      }
+
       const challenges = get().challenges.map(ch =>
         ch.cohortId === cohortId && ch.status === 'waiting'
           ? { ...ch, status: 'approved' as const, approvedAt: new Date() }
@@ -105,29 +158,59 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => {
       );
 
       set({ challenges });
-      saveToStorage(challenges);
-    },
+    } catch (error) {
+      console.error('Approve challenge error:', error);
+    }
+  },
 
-    // 챌린지 시작 (사전 설문 완료 후)
-    startChallenge: (cohortId) => {
+  // 챌린지 시작 (사전 설문 완료 후)
+  startChallenge: async (cohortId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('challenges')
+        .update({
+          status: 'active',
+          started_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId);
+
+      if (error) {
+        console.error('Failed to start challenge:', error);
+        return;
+      }
+
       const challenges = get().challenges.map(ch =>
         ch.cohortId === cohortId
           ? {
               ...ch,
               status: 'active' as const,
-              startedAt: new Date()  // 사용자가 설문 완료한 실제 시점
+              startedAt: new Date()
             }
           : ch
       );
 
       set({ challenges });
-      saveToStorage(challenges);
-    },
+    } catch (error) {
+      console.error('Start challenge error:', error);
+    }
+  },
 
-    // 특정 날짜 완료 처리 (스탬프 획득)
-    completeDay: (cohortId, day) => {
+  // 특정 날짜 완료 처리 (스탬프 획득)
+  completeDay: async (cohortId, day) => {
+    try {
       const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
-      if (!challenge) return;
+      if (!challenge) {
+        console.error('Challenge not found');
+        return;
+      }
 
       console.log('🔵 [completeDay] 호출됨:', { cohortId, day, 현재_completedDays: challenge.completedDays });
 
@@ -152,6 +235,33 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => {
         completedAt = new Date();
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const updateData: any = {
+        completed_days: completedDays,
+        status: newStatus
+      };
+
+      if (completedAt) {
+        updateData.completed_at = completedAt.toISOString();
+      }
+
+      const { error } = await supabase
+        .from('challenges')
+        .update(updateData)
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId);
+
+      if (error) {
+        console.error('Failed to complete day:', error);
+        return;
+      }
+
       const challenges = get().challenges.map(ch =>
         ch.cohortId === cohortId
           ? { ...ch, completedDays, status: newStatus, completedAt }
@@ -159,36 +269,60 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => {
       );
 
       set({ challenges });
-      saveToStorage(challenges);
-    },
+    } catch (error) {
+      console.error('Complete day error:', error);
+    }
+  },
 
-    // 현재 DAY 계산 (스탬프 기반)
-    calculateCurrentDay: (cohortId) => {
-      const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
-      if (!challenge || challenge.status !== 'active') return 0;
+  // 현재 DAY 계산 (스탬프 기반)
+  calculateCurrentDay: (cohortId) => {
+    const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
+    if (!challenge || challenge.status !== 'active') return 0;
 
-      // 완료한 스탬프 개수 + 1 = 다음 기록할 DAY
-      // 예: 스탬프 0개 → DAY 1, 스탬프 1개 → DAY 2, ..., 스탬프 29개 → DAY 30
-      const calculatedDay = Math.min(challenge.completedDays.length + 1, 30);
-      console.log('📅 [calculateCurrentDay]', {
-        completedDays: challenge.completedDays,
-        length: challenge.completedDays.length,
-        calculatedDay
-      });
-      return calculatedDay;
-    },
+    // 완료한 스탬프 개수 + 1 = 다음 기록할 DAY
+    // 예: 스탬프 0개 → DAY 1, 스탬프 1개 → DAY 2, ..., 스탬프 29개 → DAY 30
+    const calculatedDay = Math.min(challenge.completedDays.length + 1, 30);
+    console.log('📅 [calculateCurrentDay]', {
+      completedDays: challenge.completedDays,
+      length: challenge.completedDays.length,
+      calculatedDay
+    });
+    return calculatedDay;
+  },
 
-    // 사전 설문 시작 가능 여부
-    canStartPreSurvey: (cohortId) => {
-      const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
-      if (!challenge) return false;
+  // 사전 설문 시작 가능 여부
+  canStartPreSurvey: (cohortId) => {
+    const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
+    if (!challenge) return false;
 
-      // approved 상태이면 바로 설문 가능 (날짜 제약 없음)
-      return challenge.status === 'approved';
-    },
+    // approved 상태이면 바로 설문 가능 (날짜 제약 없음)
+    return challenge.status === 'approved';
+  },
 
-    // 챌린지 완료 처리 (사후 설문 완료 후 호출)
-    completeChallenge: (cohortId) => {
+  // 챌린지 완료 처리 (사후 설문 완료 후 호출)
+  completeChallenge: async (cohortId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('challenges')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId);
+
+      if (error) {
+        console.error('Failed to complete challenge:', error);
+        return;
+      }
+
       const challenges = get().challenges.map(ch =>
         ch.cohortId === cohortId
           ? {
@@ -200,28 +334,50 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => {
       );
 
       set({ challenges });
-      saveToStorage(challenges);
-    },
+    } catch (error) {
+      console.error('Complete challenge error:', error);
+    }
+  },
 
-    // 리포트 접근 가능 여부 (22일 이상 + 30일 완료)
-    canAccessReport: (cohortId) => {
-      const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
-      if (!challenge) return false;
+  // 리포트 접근 가능 여부 (22일 이상 + 30일 완료)
+  canAccessReport: (cohortId) => {
+    const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
+    if (!challenge) return false;
 
-      return challenge.status === 'completed' &&
-             challenge.completedDays.length >= 22;
-    },
+    return challenge.status === 'completed' &&
+           challenge.completedDays.length >= 22;
+  },
 
-    // 특정 기수 챌린지 조회
-    getCurrentChallenge: (cohortId) => {
-      return get().challenges.find(ch => ch.cohortId === cohortId);
-    },
+  // 특정 기수 챌린지 조회
+  getCurrentChallenge: (cohortId) => {
+    return get().challenges.find(ch => ch.cohortId === cohortId);
+  },
 
-    // 챌린지 리셋 (특정 기수)
-    resetChallenge: (cohortId) => {
+  // 챌린지 리셋 (특정 기수)
+  resetChallenge: async (cohortId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('challenges')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('cohort_id', cohortId);
+
+      if (error) {
+        console.error('Failed to reset challenge:', error);
+        return;
+      }
+
       const challenges = get().challenges.filter(ch => ch.cohortId !== cohortId);
       set({ challenges });
-      saveToStorage(challenges);
+    } catch (error) {
+      console.error('Reset challenge error:', error);
     }
-  };
-});
+  }
+}));

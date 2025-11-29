@@ -22,7 +22,6 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
 
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
-  const { applyChallenge } = useChallengeStore();
   const { signup } = useAuthStore();
 
   const handleChange = (field: string, value: string) => {
@@ -107,9 +106,9 @@ export default function Signup() {
       markCodeAsUsed(formData.code);
 
       // 4. 챌린지 자동 신청 (approved 상태로)
-      applyChallenge(codeResult.cohortId);
       const challengeStore = useChallengeStore.getState();
-      challengeStore.approveChallenge(codeResult.cohortId);
+      await challengeStore.applyChallenge(codeResult.cohortId);
+      await challengeStore.approveChallenge(codeResult.cohortId);
 
       // 5. 온보딩 완료 처리
       localStorage.setItem('hasCompletedOnboarding', 'true');
