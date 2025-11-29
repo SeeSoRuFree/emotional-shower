@@ -20,16 +20,23 @@ export default function Profile() {
 
   const { getCurrentChallenge, calculateCurrentDay, canAccessReport } = useChallengeStore();
   const { getCohortById } = useCohortStore();
-  const { records, loadRecords, initialized } = useDailyRecordStore();
-  const { preSurvey } = useSurveyStore();
+  const { records, loadRecords, initialized: recordsInitialized } = useDailyRecordStore();
+  const { preSurvey, loadSurveys, initialized: surveysInitialized } = useSurveyStore();
   const [showSettings, setShowSettings] = useState(false);
 
   // Load daily records on mount
   useEffect(() => {
-    if (!initialized) {
+    if (!recordsInitialized) {
       loadRecords();
     }
-  }, [initialized, loadRecords]);
+  }, [recordsInitialized, loadRecords]);
+
+  // Load surveys on mount
+  useEffect(() => {
+    if (!surveysInitialized) {
+      loadSurveys();
+    }
+  }, [surveysInitialized, loadSurveys]);
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
   const currentCohort = cohortId ? getCohortById(cohortId) : null;

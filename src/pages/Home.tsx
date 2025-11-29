@@ -52,7 +52,7 @@ export default function Home() {
 
   const { getCohortById } = useCohortStore();
   const { getTodayRecord, loadRecords, initialized: recordsInitialized } = useDailyRecordStore();
-  const { preSurvey, postSurvey } = useSurveyStore();
+  const { preSurvey, postSurvey, loadSurveys, initialized: surveysInitialized } = useSurveyStore();
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
   const currentCohort = cohortId ? getCohortById(cohortId) : null;
@@ -73,6 +73,13 @@ export default function Home() {
       loadRecords();
     }
   }, [recordsInitialized, loadRecords]);
+
+  // Load surveys on mount
+  useEffect(() => {
+    if (!surveysInitialized) {
+      loadSurveys();
+    }
+  }, [surveysInitialized, loadSurveys]);
 
   useEffect(() => {
     if (userChallenge && cohortId) {

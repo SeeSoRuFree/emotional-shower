@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
 
 // 설문 응답 (1-5 리커트 척도)
 export interface SurveyResponse {
@@ -22,10 +23,13 @@ export interface SurveyData {
 interface SurveyStore {
   preSurvey: SurveyData | null;
   postSurvey: SurveyData | null;
+  loading: boolean;
+  initialized: boolean;
 
   // Actions
-  submitPreSurvey: (responses: SurveyResponse[]) => void;
-  submitPostSurvey: (responses: SurveyResponse[]) => void;
+  loadSurveys: () => Promise<void>;
+  submitPreSurvey: (responses: SurveyResponse[]) => Promise<void>;
+  submitPostSurvey: (responses: SurveyResponse[]) => Promise<void>;
   calculateScores: (responses: SurveyResponse[]) => {
     flourishing: number;
     lifeSatisfaction: number;
@@ -36,77 +40,152 @@ interface SurveyStore {
   hasCompletedPostSurvey: () => boolean;
 }
 
-const STORAGE_KEY = 'kindness-surveys';
+export const useSurveyStore = create<SurveyStore>((set, get) => ({
+  preSurvey: null,
+  postSurvey: null,
+  loading: false,
+  initialized: false,
 
-// LocalStorage 로드
-const loadFromStorage = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const data = JSON.parse(stored);
-      return {
-        preSurvey: data.preSurvey ? {
-          ...data.preSurvey,
-          completedAt: new Date(data.preSurvey.completedAt)
-        } : null,
-        postSurvey: data.postSurvey ? {
-          ...data.postSurvey,
-          completedAt: new Date(data.postSurvey.completedAt)
-        } : null
-      };
+  // Supabase에서 설문 로드
+  loadSurveys: async () => {
+    try {
+      set({ loading: true });
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        set({ preSurvey: null, postSurvey: null, loading: false, initialized: true });
+        return;
+      }
+
+      // 현재 사용자의 현재 cohort_id 가져오기
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) {
+        set({ preSurvey: null, postSurvey: null, loading: false, initialized: true });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('surveys')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id);
+
+      if (error) {
+        console.error('Failed to load surveys:', error);
+        set({ loading: false });
+        return;
+      }
+
+      let preSurvey: SurveyData | null = null;
+      let postSurvey: SurveyData | null = null;
+
+      if (data) {
+        const preData = data.find(s => s.survey_type === 'pre_survey');
+        const postData = data.find(s => s.survey_type === 'post_survey');
+
+        if (preData) {
+          const scores = preData.scores as any;
+          preSurvey = {
+            type: 'pre',
+            completedAt: new Date(preData.created_at),
+            responses: preData.responses as SurveyResponse[],
+            flourishingScore: scores.flourishing || 0,
+            lifeSatisfactionScore: scores.life_satisfaction || 0,
+            selfCompassionScore: scores.self_compassion || 0,
+            kindnessScore: scores.kindness || 0
+          };
+        }
+
+        if (postData) {
+          const scores = postData.scores as any;
+          postSurvey = {
+            type: 'post',
+            completedAt: new Date(postData.created_at),
+            responses: postData.responses as SurveyResponse[],
+            flourishingScore: scores.flourishing || 0,
+            lifeSatisfactionScore: scores.life_satisfaction || 0,
+            selfCompassionScore: scores.self_compassion || 0,
+            kindnessScore: scores.kindness || 0
+          };
+        }
+      }
+
+      set({ preSurvey, postSurvey, loading: false, initialized: true });
+    } catch (error) {
+      console.error('Load surveys error:', error);
+      set({ loading: false });
     }
-  } catch (error) {
-    console.error('Failed to load survey data:', error);
-  }
-  return { preSurvey: null, postSurvey: null };
-};
+  },
 
-// LocalStorage 저장
-const saveToStorage = (preSurvey: SurveyData | null, postSurvey: SurveyData | null) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ preSurvey, postSurvey }));
-  } catch (error) {
-    console.error('Failed to save survey data:', error);
-  }
-};
+  // 점수 계산 로직
+  calculateScores: (responses: SurveyResponse[]) => {
+    // 문항 ID 규칙:
+    // flourishing-1 ~ flourishing-14 (14문항)
+    // satisfaction-1 ~ satisfaction-5 (5문항)
+    // compassion-1 ~ compassion-12 (12문항)
+    // kindness-1 ~ kindness-3 (3문항)
 
-export const useSurveyStore = create<SurveyStore>((set, get) => {
-  const { preSurvey, postSurvey } = loadFromStorage();
+    const flourishingResponses = responses.filter(r => r.questionId.startsWith('flourishing'));
+    const satisfactionResponses = responses.filter(r => r.questionId.startsWith('satisfaction'));
+    const compassionResponses = responses.filter(r => r.questionId.startsWith('compassion'));
+    const kindnessResponses = responses.filter(r => r.questionId.startsWith('kindness'));
 
-  return {
-    preSurvey,
-    postSurvey,
+    const calculateAverage = (items: SurveyResponse[]) => {
+      if (items.length === 0) return 0;
+      const sum = items.reduce((acc, item) => acc + item.value, 0);
+      return Math.round((sum / items.length) * 100) / 100; // 소수점 2자리
+    };
 
-    // 점수 계산 로직
-    calculateScores: (responses: SurveyResponse[]) => {
-      // 문항 ID 규칙:
-      // flourishing-1 ~ flourishing-14 (14문항)
-      // satisfaction-1 ~ satisfaction-5 (5문항)
-      // compassion-1 ~ compassion-12 (12문항)
-      // kindness-1 ~ kindness-3 (3문항)
+    return {
+      flourishing: calculateAverage(flourishingResponses),
+      lifeSatisfaction: calculateAverage(satisfactionResponses),
+      selfCompassion: calculateAverage(compassionResponses),
+      kindness: calculateAverage(kindnessResponses)
+    };
+  },
 
-      const flourishingResponses = responses.filter(r => r.questionId.startsWith('flourishing'));
-      const satisfactionResponses = responses.filter(r => r.questionId.startsWith('satisfaction'));
-      const compassionResponses = responses.filter(r => r.questionId.startsWith('compassion'));
-      const kindnessResponses = responses.filter(r => r.questionId.startsWith('kindness'));
+  // 사전 설문 제출
+  submitPreSurvey: async (responses: SurveyResponse[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      const calculateAverage = (items: SurveyResponse[]) => {
-        if (items.length === 0) return 0;
-        const sum = items.reduce((acc, item) => acc + item.value, 0);
-        return Math.round((sum / items.length) * 100) / 100; // 소수점 2자리
-      };
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
 
-      return {
-        flourishing: calculateAverage(flourishingResponses),
-        lifeSatisfaction: calculateAverage(satisfactionResponses),
-        selfCompassion: calculateAverage(compassionResponses),
-        kindness: calculateAverage(kindnessResponses)
-      };
-    },
+      if (!userData?.current_cohort_id) return;
 
-    // 사전 설문 제출
-    submitPreSurvey: (responses: SurveyResponse[]) => {
+      const cohortId = userData.current_cohort_id;
       const scores = get().calculateScores(responses);
+
+      const { error } = await supabase
+        .from('surveys')
+        .insert({
+          user_id: user.id,
+          cohort_id: cohortId,
+          survey_type: 'pre_survey',
+          responses: responses,
+          scores: {
+            flourishing: scores.flourishing,
+            life_satisfaction: scores.lifeSatisfaction,
+            self_compassion: scores.selfCompassion,
+            kindness: scores.kindness
+          }
+        });
+
+      if (error) {
+        console.error('Failed to submit pre survey:', error);
+        return;
+      }
 
       const preSurveyData: SurveyData = {
         type: 'pre',
@@ -119,12 +198,47 @@ export const useSurveyStore = create<SurveyStore>((set, get) => {
       };
 
       set({ preSurvey: preSurveyData });
-      saveToStorage(preSurveyData, get().postSurvey);
-    },
+    } catch (error) {
+      console.error('Submit pre survey error:', error);
+    }
+  },
 
-    // 사후 설문 제출
-    submitPostSurvey: (responses: SurveyResponse[]) => {
+  // 사후 설문 제출
+  submitPostSurvey: async (responses: SurveyResponse[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const cohortId = userData.current_cohort_id;
       const scores = get().calculateScores(responses);
+
+      const { error } = await supabase
+        .from('surveys')
+        .insert({
+          user_id: user.id,
+          cohort_id: cohortId,
+          survey_type: 'post_survey',
+          responses: responses,
+          scores: {
+            flourishing: scores.flourishing,
+            life_satisfaction: scores.lifeSatisfaction,
+            self_compassion: scores.selfCompassion,
+            kindness: scores.kindness
+          }
+        });
+
+      if (error) {
+        console.error('Failed to submit post survey:', error);
+        return;
+      }
 
       const postSurveyData: SurveyData = {
         type: 'post',
@@ -137,20 +251,21 @@ export const useSurveyStore = create<SurveyStore>((set, get) => {
       };
 
       set({ postSurvey: postSurveyData });
-      saveToStorage(get().preSurvey, postSurveyData);
-    },
-
-    // 사전 설문 완료 여부
-    hasCompletedPreSurvey: () => {
-      return get().preSurvey !== null;
-    },
-
-    // 사후 설문 완료 여부
-    hasCompletedPostSurvey: () => {
-      return get().postSurvey !== null;
+    } catch (error) {
+      console.error('Submit post survey error:', error);
     }
-  };
-});
+  },
+
+  // 사전 설문 완료 여부
+  hasCompletedPreSurvey: () => {
+    return get().preSurvey !== null;
+  },
+
+  // 사후 설문 완료 여부
+  hasCompletedPostSurvey: () => {
+    return get().postSurvey !== null;
+  }
+}));
 
 // 설문 문항 데이터 (실제 설문에서 사용)
 export const SURVEY_QUESTIONS = {

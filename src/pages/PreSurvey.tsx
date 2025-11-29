@@ -159,7 +159,7 @@ export default function PreSurvey() {
       value
     }));
 
-    submitPreSurvey(surveyResponses);
+    await submitPreSurvey(surveyResponses);
     await startChallenge(cohortId);
 
     // 사전 설문 = DAY 1 완료 처리

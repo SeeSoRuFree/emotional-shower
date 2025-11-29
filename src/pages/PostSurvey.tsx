@@ -105,7 +105,7 @@ export default function PostSurvey() {
     if (!cohortId) return;
 
     // Save post-survey
-    submitPostSurvey(responses);
+    await submitPostSurvey(responses);
 
     // Mark challenge as completed
     await completeChallenge(cohortId);
