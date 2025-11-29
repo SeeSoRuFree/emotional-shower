@@ -55,9 +55,9 @@ export default function Apply() {
     setStep('consent');
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
     // 신청서 제출 (기수는 어드민이 승인 시 할당)
-    submitApplication({
+    await submitApplication({
       name: formData.name,
       email: formData.email,
       motivation: formData.motivation

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase';
 import { useCohortStore } from './cohortStore';
 
 // 신청자 정보
 export interface Application {
-  id: string;           // 고유 ID (timestamp)
+  id: string;           // 고유 ID (UUID from Supabase)
   name: string;
   email: string;
   motivation: string;
@@ -12,33 +13,24 @@ export interface Application {
   code: string | null;  // 승인 시 발급되는 코드
   appliedAt: Date;
   processedAt: Date | null;  // 승인/거절 처리 시간
-}
-
-// 코드-기수 매핑
-export interface CodeMapping {
-  code: string;
-  cohortId: string;
-  applicationId: string;
-  isUsed: boolean;
-  usedAt: Date | null;
+  codeUsedAt: Date | null;  // 코드 사용 시간
 }
 
 interface ApplicationStore {
   applications: Application[];
-  codeMappings: CodeMapping[];
+  loading: boolean;
+  initialized: boolean;
 
   // Actions
-  submitApplication: (data: { name: string; email: string; motivation: string }) => void;
-  approveApplication: (applicationId: string, cohortId: string) => string;  // Returns code
-  rejectApplication: (applicationId: string) => void;
+  loadApplications: () => Promise<void>;
+  submitApplication: (data: { name: string; email: string; motivation: string }) => Promise<void>;
+  approveApplication: (applicationId: string, cohortId: string) => Promise<string>;  // Returns code
+  rejectApplication: (applicationId: string) => Promise<void>;
   verifyCode: (code: string) => Promise<{ valid: boolean; cohortId?: string; applicationId?: string }>;
-  markCodeAsUsed: (code: string) => void;
+  markCodeAsUsed: (code: string) => Promise<void>;
   getApplicationsByStatus: (status: Application['status']) => Application[];
   getApplicationsByCohort: (cohortId: string) => Application[];
 }
-
-const STORAGE_KEY = 'kindness-applications';
-const CODE_STORAGE_KEY = 'kindness-codes';
 
 // 6자리 랜덤 코드 생성
 const generateCode = (): string => {
@@ -50,119 +42,144 @@ const generateCode = (): string => {
   return code;
 };
 
-// LocalStorage에서 로드
-const loadFromStorage = () => {
-  try {
-    const applicationsData = localStorage.getItem(STORAGE_KEY);
-    const codesData = localStorage.getItem(CODE_STORAGE_KEY);
+export const useApplicationStore = create<ApplicationStore>((set, get) => ({
+  applications: [],
+  loading: false,
+  initialized: false,
 
-    const parsed = {
-      applications: applicationsData ? JSON.parse(applicationsData).map((app: any) => ({
-        ...app,
-        appliedAt: new Date(app.appliedAt),
-        processedAt: app.processedAt ? new Date(app.processedAt) : null
-      })) : [],
-      codeMappings: codesData ? JSON.parse(codesData).map((code: any) => ({
-        ...code,
-        usedAt: code.usedAt ? new Date(code.usedAt) : null
-      })) : []
-    };
+  // Supabase에서 신청서 로드
+  loadApplications: async () => {
+    try {
+      set({ loading: true });
 
-    return parsed;
-  } catch (error) {
-    console.error('Failed to load applications from storage:', error);
-    return { applications: [], codeMappings: [] };
-  }
-};
+      const { data, error } = await supabase
+        .from('applications')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-// LocalStorage에 저장
-const saveToStorage = (applications: Application[], codeMappings: CodeMapping[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
-    localStorage.setItem(CODE_STORAGE_KEY, JSON.stringify(codeMappings));
-  } catch (error) {
-    console.error('Failed to save applications to storage:', error);
-  }
-};
-
-export const useApplicationStore = create<ApplicationStore>((set, get) => {
-  const { applications: storedApps, codeMappings: storedCodes } = loadFromStorage();
-
-  // 초기화: 테스트용 코드가 없으면 생성
-  // Note: cohortId는 임시값. verifyCode 시 실제 UUID로 교체됨
-  if (!storedCodes.some(code => code.code === 'TEST01')) {
-    const testCodeMapping: CodeMapping = {
-      code: 'TEST01',
-      cohortId: 'TEMP_WILL_BE_REPLACED', // Placeholder
-      applicationId: 'test-application',
-      isUsed: false,
-      usedAt: null
-    };
-    storedCodes.push(testCodeMapping);
-    saveToStorage(storedApps, storedCodes);
-  }
-
-  return {
-    applications: storedApps,
-    codeMappings: storedCodes,
-
-    // 신청서 제출 (기수 선택 없음)
-    submitApplication: (data) => {
-      const newApplication: Application = {
-        id: Date.now().toString(),
-        name: data.name,
-        email: data.email,
-        motivation: data.motivation,
-        cohortId: null,  // 어드민이 승인 시 할당
-        status: 'pending',
-        code: null,
-        appliedAt: new Date(),
-        processedAt: null
-      };
-
-      const applications = [...get().applications, newApplication];
-      set({ applications });
-      saveToStorage(applications, get().codeMappings);
-    },
-
-    // 신청 승인 (코드 발급 + 기수 할당)
-    approveApplication: (applicationId, cohortId) => {
-      const applications = get().applications;
-      const application = applications.find(app => app.id === applicationId);
-
-      if (!application) {
-        throw new Error('Application not found');
+      if (error) {
+        console.error('Failed to load applications:', error);
+        set({ loading: false });
+        return;
       }
 
+      const applications: Application[] = (data || []).map(row => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        motivation: row.motivation,
+        cohortId: row.cohort_id,
+        status: row.status,
+        code: row.code,
+        appliedAt: new Date(row.created_at),
+        processedAt: row.processed_at ? new Date(row.processed_at) : null,
+        codeUsedAt: row.code_used_at ? new Date(row.code_used_at) : null
+      }));
+
+      set({ applications, loading: false, initialized: true });
+    } catch (error) {
+      console.error('Load applications error:', error);
+      set({ loading: false });
+    }
+  },
+
+  // 신청서 제출 (기수 선택 없음)
+  submitApplication: async (data) => {
+    try {
+      const { data: newApp, error } = await supabase
+        .from('applications')
+        .insert({
+          name: data.name,
+          email: data.email,
+          motivation: data.motivation,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to submit application:', error);
+        return;
+      }
+
+      const application: Application = {
+        id: newApp.id,
+        name: newApp.name,
+        email: newApp.email,
+        motivation: newApp.motivation,
+        cohortId: null,
+        status: 'pending',
+        code: null,
+        appliedAt: new Date(newApp.created_at),
+        processedAt: null,
+        codeUsedAt: null
+      };
+
+      set({ applications: [...get().applications, application] });
+    } catch (error) {
+      console.error('Submit application error:', error);
+    }
+  },
+
+  // 신청 승인 (코드 발급 + 기수 할당)
+  approveApplication: async (applicationId, cohortId) => {
+    try {
       // 고유한 코드 생성
       let code = generateCode();
-      while (get().codeMappings.some(mapping => mapping.code === code)) {
-        code = generateCode();
+      let isUnique = false;
+
+      // 코드 중복 확인
+      while (!isUnique) {
+        const { data: existing } = await supabase
+          .from('applications')
+          .select('code')
+          .eq('code', code)
+          .single();
+
+        if (!existing) {
+          isUnique = true;
+        } else {
+          code = generateCode();
+        }
       }
 
       // 신청서 상태 업데이트 (기수 할당)
-      const updatedApplications = applications.map(app =>
+      const { data: updated, error } = await supabase
+        .from('applications')
+        .update({
+          status: 'approved',
+          code: code,
+          cohort_id: cohortId,
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', applicationId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to approve application:', error);
+        throw new Error('Failed to approve application');
+      }
+
+      // 로컬 상태 업데이트
+      const updatedApplications = get().applications.map(app =>
         app.id === applicationId
-          ? { ...app, status: 'approved' as const, code, cohortId, processedAt: new Date() }
+          ? {
+              ...app,
+              status: 'approved' as const,
+              code,
+              cohortId,
+              processedAt: new Date(updated.processed_at)
+            }
           : app
       );
 
-      // 코드 매핑 추가
-      const newCodeMapping: CodeMapping = {
-        code,
-        cohortId,
-        applicationId: application.id,
-        isUsed: false,
-        usedAt: null
-      };
-
-      const codeMappings = [...get().codeMappings, newCodeMapping];
-
-      set({ applications: updatedApplications, codeMappings });
-      saveToStorage(updatedApplications, codeMappings);
+      set({ applications: updatedApplications });
 
       // 이메일 발송 시뮬레이션
-      console.log(`
+      const application = get().applications.find(app => app.id === applicationId);
+      if (application) {
+        console.log(`
 📧 이메일 발송 시뮬레이션
 ━━━━━━━━━━━━━━━━━━━━
 To: ${application.email}
@@ -177,13 +194,32 @@ Subject: [정서샤워] 챌린지 승인 안내
 할당 기수: ${cohortId}
 
 감사합니다.
-      `);
+        `);
+      }
 
       return code;
-    },
+    } catch (error) {
+      console.error('Approve application error:', error);
+      throw error;
+    }
+  },
 
-    // 신청 거절
-    rejectApplication: (applicationId) => {
+  // 신청 거절
+  rejectApplication: async (applicationId) => {
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          status: 'rejected',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', applicationId);
+
+      if (error) {
+        console.error('Failed to reject application:', error);
+        return;
+      }
+
       const applications = get().applications.map(app =>
         app.id === applicationId
           ? { ...app, status: 'rejected' as const, processedAt: new Date() }
@@ -191,69 +227,103 @@ Subject: [정서샤워] 챌린지 승인 안내
       );
 
       set({ applications });
-      saveToStorage(applications, get().codeMappings);
-    },
+    } catch (error) {
+      console.error('Reject application error:', error);
+    }
+  },
 
-    // 코드 검증
-    verifyCode: async (code) => {
-      const mapping = get().codeMappings.find(m => m.code === code.toUpperCase());
-
-      if (!mapping) {
-        return { valid: false };
-      }
-
-      if (mapping.isUsed) {
-        return { valid: false };
-      }
+  // 코드 검증
+  verifyCode: async (code) => {
+    try {
+      const upperCode = code.toUpperCase();
 
       // TEST01 코드의 경우, cohortStore에서 실제 UUID 가져오기
-      let actualCohortId = mapping.cohortId;
-      if (code.toUpperCase() === 'TEST01') {
+      if (upperCode === 'TEST01') {
         try {
           const cohortStore = useCohortStore.getState();
-          actualCohortId = await cohortStore.ensureTestCohort();
+          const actualCohortId = await cohortStore.ensureTestCohort();
 
-          // 실제 UUID로 매핑 업데이트
-          const updatedMappings = get().codeMappings.map(m =>
-            m.code === 'TEST01'
-              ? { ...m, cohortId: actualCohortId }
-              : m
-          );
-          set({ codeMappings: updatedMappings });
-          saveToStorage(get().applications, updatedMappings);
+          return {
+            valid: true,
+            cohortId: actualCohortId,
+            applicationId: 'test-application'
+          };
         } catch (error) {
           console.error('Failed to get test cohort UUID:', error);
           return { valid: false };
         }
       }
 
+      // Supabase에서 코드 검증
+      const { data, error } = await supabase
+        .from('applications')
+        .select('*')
+        .eq('code', upperCode)
+        .eq('status', 'approved')
+        .single();
+
+      if (error || !data) {
+        return { valid: false };
+      }
+
+      // 이미 사용된 코드인지 확인
+      if (data.code_used_at) {
+        return { valid: false };
+      }
+
       return {
         valid: true,
-        cohortId: actualCohortId,
-        applicationId: mapping.applicationId
+        cohortId: data.cohort_id,
+        applicationId: data.id
       };
-    },
+    } catch (error) {
+      console.error('Verify code error:', error);
+      return { valid: false };
+    }
+  },
 
-    // 코드 사용 처리
-    markCodeAsUsed: (code) => {
-      const codeMappings = get().codeMappings.map(mapping =>
-        mapping.code === code.toUpperCase()
-          ? { ...mapping, isUsed: true, usedAt: new Date() }
-          : mapping
+  // 코드 사용 처리
+  markCodeAsUsed: async (code) => {
+    try {
+      const upperCode = code.toUpperCase();
+
+      // TEST01 코드는 무시 (테스트용)
+      if (upperCode === 'TEST01') {
+        return;
+      }
+
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          code_used_at: new Date().toISOString()
+        })
+        .eq('code', upperCode);
+
+      if (error) {
+        console.error('Failed to mark code as used:', error);
+        return;
+      }
+
+      // 로컬 상태 업데이트
+      const applications = get().applications.map(app =>
+        app.code === upperCode
+          ? { ...app, codeUsedAt: new Date() }
+          : app
       );
 
-      set({ codeMappings });
-      saveToStorage(get().applications, codeMappings);
-    },
-
-    // 상태별 신청서 조회
-    getApplicationsByStatus: (status) => {
-      return get().applications.filter(app => app.status === status);
-    },
-
-    // 기수별 신청서 조회
-    getApplicationsByCohort: (cohortId) => {
-      return get().applications.filter(app => app.cohortId === cohortId);
+      set({ applications });
+    } catch (error) {
+      console.error('Mark code as used error:', error);
     }
-  };
-});
+  },
+
+  // 상태별 신청서 조회
+  getApplicationsByStatus: (status) => {
+    return get().applications.filter(app => app.status === status);
+  },
+
+  // 기수별 신청서 조회
+  getApplicationsByCohort: (cohortId) => {
+    return get().applications.filter(app => app.cohortId === cohortId);
+  }
+}));

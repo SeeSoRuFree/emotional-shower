@@ -103,7 +103,7 @@ export default function Signup() {
       }
 
       // 3. 코드 사용 처리
-      markCodeAsUsed(formData.code);
+      await markCodeAsUsed(formData.code);
 
       // 4. 챌린지 자동 신청 (approved 상태로)
       const challengeStore = useChallengeStore.getState();

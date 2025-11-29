@@ -7,33 +7,40 @@ import { motion } from 'framer-motion';
 type TabType = 'pending' | 'approved' | 'rejected';
 
 export default function ApplicationManagement() {
-  const { applications, approveApplication, rejectApplication } = useApplicationStore();
+  const { applications, approveApplication, rejectApplication, loadApplications, initialized } = useApplicationStore();
   const { cohorts } = useCohortStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [selectedCohortForApproval, setSelectedCohortForApproval] = useState<string>('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
+  // Load applications on mount
+  useEffect(() => {
+    if (!initialized) {
+      loadApplications();
+    }
+  }, [initialized, loadApplications]);
+
   // Filter applications by status
   const filteredApplications = useMemo(() => {
     return applications.filter(app => app.status === activeTab);
   }, [applications, activeTab]);
 
-  const handleApprove = (applicationId: string) => {
+  const handleApprove = async (applicationId: string) => {
     if (!selectedCohortForApproval) {
       alert('기수를 선택해주세요');
       return;
     }
 
-    const code = approveApplication(applicationId, selectedCohortForApproval);
+    const code = await approveApplication(applicationId, selectedCohortForApproval);
     alert(`승인되었습니다!\n\n발급된 코드: ${code}\n\n이메일로 코드가 전송됩니다.`);
     setApprovingId(null);
     setSelectedCohortForApproval('');
   };
 
-  const handleReject = (applicationId: string, applicantName: string) => {
+  const handleReject = async (applicationId: string, applicantName: string) => {
     if (confirm(`정말로 "${applicantName}"님의 신청을 거절하시겠습니까?`)) {
-      rejectApplication(applicationId);
+      await rejectApplication(applicationId);
     }
   };
 
