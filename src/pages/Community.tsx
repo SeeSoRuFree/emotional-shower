@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, MessageCircle, Sparkles, Edit3, Send, Users, TrendingUp, Flame, Award, ArrowRight } from 'lucide-react';
 import ResponsiveNav from '@/components/common/ResponsiveNav';
-import { loadAllPosts, addPost, togglePostLike, generateCohortStats, type Post, type CohortStats } from '@/utils/communityStorage';
+import { useCommunityStore, type Post, type CohortStats } from '@/store/communityStore';
 import { recommendQuote } from '@/utils/quoteRecommendation';
-import { seedAllRoomsWithDummyData } from '@/utils/dummyData';
 import { useChallengeStore } from '@/store/challengeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useCohortStore } from '@/store/cohortStore';
@@ -40,10 +39,17 @@ export default function Community() {
 
   const { getCurrentChallenge, calculateCurrentDay } = useChallengeStore();
   const { getCohortById } = useCohortStore();
+  const {
+    posts,
+    loadAllPosts,
+    addPost: addPostToStore,
+    incrementPostLikes,
+    generateCohortStats,
+    initialized
+  } = useCommunityStore();
 
   const [isWriting, setIsWriting] = useState(false);
   const [postContent, setPostContent] = useState('');
-  const [posts, setPosts] = useState<Post[]>([]);
   const [stats, setStats] = useState<CohortStats | null>(null);
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
@@ -52,23 +58,20 @@ export default function Community() {
   const currentDay = userChallenge && cohortId ? calculateCurrentDay(cohortId) : 0;
   const userStamps = userChallenge?.completedDays.length || 0;
 
-  // 더미 데이터 생성 및 게시글 로드
+  // Load posts from Supabase
   useEffect(() => {
-    if (!cohortId) return;
+    if (!cohortId || initialized) return;
 
-    seedAllRoomsWithDummyData();
-    const allPosts = loadAllPosts();
+    loadAllPosts(cohortId);
+  }, [cohortId, initialized, loadAllPosts]);
 
-    // 현재 기수의 게시글만 필터링
-    const cohortPosts = allPosts.filter(post => post.cohortId === cohortId);
-    setPosts(cohortPosts);
+  // Generate cohort statistics
+  useEffect(() => {
+    if (!cohortId || !currentCohort || !userChallenge) return;
 
-    // 기수 통계 생성
-    if (currentCohort && userChallenge) {
-      const cohortStats = generateCohortStats(currentCohort.id, userStamps, currentDay);
-      setStats(cohortStats);
-    }
-  }, [cohortId, currentCohort, userStamps]);
+    const cohortStats = generateCohortStats(currentCohort.id, userStamps, currentDay);
+    setStats(cohortStats);
+  }, [cohortId, currentCohort, userChallenge, userStamps, currentDay, generateCohortStats]);
 
   const handleStartWriting = () => {
     setIsWriting(true);
@@ -79,29 +82,22 @@ export default function Community() {
     setPostContent('');
   };
 
-  const handleSubmitPost = () => {
+  const handleSubmitPost = async () => {
     if (postContent.trim() && cohortId) {
       // 명언 추천 (기본 감정은 'celebrate'로)
       const recommendedQuote = recommendQuote(postContent, 'celebrate');
 
       // 게시글 추가 (unified feed, roomId는 'unified'로, cohortId 포함)
-      const newPost = addPost('unified', cohortId, postContent, recommendedQuote || undefined);
+      await addPostToStore(cohortId, 'unified', postContent, recommendedQuote || undefined);
 
-      // UI 업데이트
-      setPosts(prev => [newPost, ...prev]);
       setPostContent('');
       setIsWriting(false);
     }
   };
 
   // 게시글 좋아요
-  const handlePostLike = (postId: string, roomId: string) => {
-    togglePostLike(roomId, postId);
-    setPosts(prev => prev.map(post =>
-      post.id === postId
-        ? { ...post, likes: post.likes + 1 }
-        : post
-    ));
+  const handlePostLike = async (postId: string) => {
+    await incrementPostLikes(postId);
   };
 
   // 댓글 페이지로 이동
@@ -491,7 +487,7 @@ export default function Community() {
                     whileTap={{ scale: 0.95 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handlePostLike(post.id, post.roomId);
+                      handlePostLike(post.id);
                     }}
                     className="flex items-center gap-2 text-headspace-textMuted hover:text-headspace-pink transition-colors"
                   >
