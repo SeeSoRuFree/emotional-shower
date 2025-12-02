@@ -55,7 +55,7 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
       const { data, error } = await supabase
         .from('applications')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('applied_at', { ascending: false });
 
       if (error) {
         console.error('Failed to load applications:', error);
@@ -71,7 +71,7 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
         cohortId: row.cohort_id,
         status: row.status,
         code: row.code,
-        appliedAt: new Date(row.created_at),
+        appliedAt: new Date(row.applied_at),
         processedAt: row.processed_at ? new Date(row.processed_at) : null,
         codeUsedAt: row.code_used_at ? new Date(row.code_used_at) : null
       }));
@@ -110,7 +110,7 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
         cohortId: null,
         status: 'pending',
         code: null,
-        appliedAt: new Date(newApp.created_at),
+        appliedAt: new Date(newApp.applied_at),
         processedAt: null,
         codeUsedAt: null
       };

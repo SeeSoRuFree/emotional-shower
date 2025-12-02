@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**정서샤워 (Emotional Shower)** is a mobile-first web application focused on emotional hygiene and kindness challenge. It combines emotional check-ins, AI conversations, community features, and a 30-day kindness challenge with cohort-based participation tracking.
+**정서샤워 (Emotional Shower)** is a mobile-first web application focused on emotional hygiene and a 30-day kindness challenge. It combines emotional check-ins, AI conversations, community features, and cohort-based participation tracking with full Supabase backend integration.
 
 ## Development Commands
 
@@ -22,60 +22,95 @@ npm run lint         # Run ESLint on entire codebase
 
 ## Architecture Overview
 
-### State Management (Zustand)
+### Backend: Supabase
 
-The app uses Zustand for all state management with localStorage persistence. Key stores:
+The app uses Supabase as the backend for authentication, database, and real-time features:
 
-- **authStore.ts**: User authentication and cohort participation tracking. Users can participate in multiple cohorts over time. Each user has `currentCohortId` and `cohortHistory` tracking all participations.
+- **Authentication**: Supabase Auth with email/password
+- **Database**: PostgreSQL with Row Level Security (RLS)
+- **Environment variables**: Configured in `.env.local`
+  - `VITE_SUPABASE_URL`: Supabase project URL
+  - `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
 
-- **challengeStore.ts**: Challenge progress tracking per cohort. Manages challenge lifecycle: `waiting` → `approved` → `active` → `completed`/`failed`. Tracks completed days (stamps) and calculates current day based on stamp count, not calendar dates.
+**Database Schema** (defined in `supabase/migrations/`):
+- `users`: User profiles with name, email, current_cohort_id
+- `cohorts`: Cohort information (start/end dates, capacity)
+- `user_cohorts`: Many-to-many relationship tracking user participation in cohorts
+- `challenges`: Per-user, per-cohort challenge progress
+- `daily_records`: Daily kindness action records with JSONB arrays
+- `surveys`: Pre/post survey responses
+- `applications`: Challenge application requests
+- `application_codes`: Admin-generated codes for application approval
+- `community_posts`: Community posts with cohort/room filtering
+- `community_comments`: Comments on community posts
 
-- **dailyRecordStore.ts**: Daily kindness action records with three action types (self, others, environment) and reflection notes.
+### State Management (Zustand + Supabase)
 
-- **cohortStore.ts**: Cohort information and management. Each cohort has start/end dates and participant lists.
+The app uses Zustand for client-side state management, synchronized with Supabase:
 
-- **communityStorage.ts**: Community posts and comments with cohort-based filtering. Posts include recommended quotes from the quote recommendation system.
+- **authStore.ts**: User authentication and cohort participation. Calls Supabase Auth methods (`signUp`, `signInWithPassword`, `signOut`). Loads user profile and cohort history from `users` and `user_cohorts` tables.
 
-All stores follow the pattern of loading from localStorage on init and saving on every update. Date fields are serialized/deserialized properly.
+- **challengeStore.ts**: Challenge progress per cohort. Manages challenge lifecycle: `waiting` → `approved` → `active` → `completed`/`failed`. Stores completed days (stamps) in `challenges` table. Current day calculated as: `completedDays.length + 1` (stamp-based, not calendar-based).
+
+- **dailyRecordStore.ts**: Daily kindness actions with two types (self-care, kindness to others). Actions stored as JSONB arrays in `daily_records` table. Each record has `isCompleted` flag and optional `quote`.
+
+- **cohortStore.ts**: Cohort metadata loaded from `cohorts` table. Admin functions for creating/managing cohorts.
+
+- **communityStore.ts**: Community posts and comments. Loads from `community_posts` and `community_comments` tables with cohort filtering. Uses RPC functions for atomic like increments.
+
+- **surveyStore.ts**: Pre/post survey responses stored in `surveys` table.
+
+- **applicationStore.ts**: Challenge applications and admin code verification. Uses `applications` and `application_codes` tables.
+
+**Key Pattern**: All stores call `supabase.auth.getUser()` to get current user, then perform authenticated queries with RLS automatically applied.
 
 ### Authentication & Cohort System
 
-- Users sign up for a specific cohort during registration
+- Users sign up via Supabase Auth during registration (`authStore.signup()`)
+- User profile created in `users` table with selected `current_cohort_id`
+- Participation recorded in `user_cohorts` junction table
 - Existing users can join new cohorts via `joinCohort()` in authStore
-- Only one active cohort per user at a time
-- Cohort participation history is preserved for all users
-- Test account: `test@test.com` / `test123` (pre-configured with cohort-1)
+- Only one active cohort per user at a time (`currentCohortId`)
+- Session managed by Supabase with auto-refresh tokens
+- Auth state changes listened in `App.tsx` via `supabase.auth.onAuthStateChange()`
 
 ### Challenge Flow (30-Day Kindness Challenge)
 
-1. **Application**: User applies via `/apply` → status: `waiting`
-2. **Approval**: Admin approves via code verification → status: `approved`
-3. **Pre-Survey**: User completes `/pre-survey` → status: `active`, `startedAt` recorded
-4. **Daily Records**: User records daily kindness actions at `/daily-record`
-   - Current day calculated as: `completedDays.length + 1`
-   - Each completed day adds a stamp to `completedDays` array
+1. **Registration**: User signs up and selects a cohort → account created in Supabase Auth + `users` table
+2. **Onboarding**: Complete 6-step onboarding flow at `/onboarding`
+3. **Application**: User applies via application form → `applications` table entry with status: `pending`
+4. **Admin Approval**: Admin generates code in `/admin`, user verifies at `/code-verify` → application status: `approved`
+5. **Pre-Survey**: User completes `/pre-survey` → challenge status: `active`, `startedAt` recorded in `challenges` table
+6. **Daily Records**: User records daily kindness actions at `/daily-record`
+   - Current day = `completedDays.length + 1`
+   - Each completion adds day number to `completedDays` array and updates `daily_records` table
    - Day numbers are 1-indexed (DAY 1-30)
-5. **Post-Survey**: Available when DAY 30 is completed
-6. **Report**: Accessible only when completed with ≥22 stamps
+7. **Post-Survey**: Available when all 30 days completed → `/post-survey`
+8. **Report**: Accessible only when completed with ≥22 stamps → `/report`
 
-**Important**: The challenge uses stamp-based progression, not calendar dates. Users progress at their own pace.
+**Critical**: The challenge uses stamp-based progression, not calendar dates. Users progress at their own pace.
 
 ### Routing Structure
 
-App.tsx defines the routing hierarchy:
+`App.tsx` defines the routing hierarchy:
 
-- **Public routes**: `/intro`, `/signup`, `/login`, `/apply`, `/admin`
-- **Protected routes** (require `isLoggedIn`): `/home`, `/daily-record`, `/community`, `/profile`, etc.
-- First-time visitors always start at `/intro`
-- All protected routes redirect to `/login` if not authenticated
+- **Public routes**: `/intro`, `/signup`, `/login`, `/apply`
+- **Protected routes** (require `isLoggedIn`): `/home`, `/onboarding`, `/daily-record`, `/pre-survey`, `/post-survey`, `/report`, `/community`, `/profile`
+- **Admin routes**: `/admin/login`, `/admin/dashboard`, `/admin/users`, `/admin/cohorts`, `/admin/applications`, `/admin/statistics`
+- **Error pages**: `/unauthorized`, `/waiting`, `/not-found`
+- First-time visitors start at `/intro` (splash → intro flow)
+- Protected routes redirect to `/unauthorized` if not authenticated
+- Admin routes require `isAdminLoggedIn` from `adminAuthStore`
 
 ### Community System
 
-- **Cohort-based feed**: Community page shows unified feed from all rooms for the user's cohort
-- **Room-based storage**: Posts stored separately per room (`community_posts_{roomId}`)
-- **Quote recommendations**: When posting, users get AI-recommended quotes that appear as first comment
-- **Statistics dashboard**: Real-time cohort stats (total users, completion rates, perfect streaks, top rankings)
-- **Anonymous posting**: All posts/comments use generated anonymous usernames
+- **Cohort-based feed**: Shows unified feed from all 5 themed rooms for user's cohort
+- **Room themes**: Celebration, Gratitude, Anxiety, Tiredness, Anger
+- **Database storage**: Posts in `community_posts`, comments in `community_comments`
+- **RLS filtering**: Automatically filters by `cohort_id` based on authenticated user
+- **Quote recommendations**: AI-recommended quotes stored as `recommended_quote` field, appear as system comment
+- **Statistics dashboard**: Virtual stats generated via `generateCohortStats()` utility
+- **Anonymous posting**: Auto-generated anonymous usernames (e.g., "따뜻한마음123")
 
 ### Component Organization
 
@@ -89,96 +124,151 @@ src/components/
 ├── cloud/           # Cloud animations (SkyBackground, CloudEffect, CloudEmotion)
 ├── chat/            # Chat features (VoiceRecorder, VoiceCallInterface)
 ├── community/       # Community features (PostDetail)
-└── onboarding/      # Onboarding steps (Step0-6)
+├── onboarding/      # Onboarding steps (Step0-6)
+└── admin/           # Admin components (AdminLayout, etc.)
 ```
 
 ### Design System
 
-**Cloud-Based Theme**: The app uses a clean, sky-inspired color palette defined in tailwind.config.js:
+**Cloud-Based Theme**: Clean, sky-inspired color palette defined in `tailwind.config.js`:
 
 - Primary colors: `cloud.blue` (#4A90E2), `cloud.sunshine` (#FFD93D), `cloud.rose` (#F2A6B8)
-- Sky backgrounds: `cloud.sky.light` through `cloud.sky.deep`
-- Soft pastels: `cloud.soft.*` for gentle UI elements
-- Emotion colors: Comprehensive palette in `emotion.*` namespace
+- Sky backgrounds: `cloud.sky.light`, `cloud.sky.main`, `cloud.sky.deep`
+- Soft pastels: `cloud.soft.blue`, `cloud.soft.mint`, `cloud.soft.lavender`, `cloud.soft.rose`, `cloud.soft.cream`
+- Emotion colors: Comprehensive palette in `emotion.*` namespace (happy, calm, anxious, etc.)
+- Backward compatible `headspace.*` colors
 
-Use Tailwind utility classes with the cloud/emotion color system. All UI components from shadcn/ui are pre-configured with the theme.
+Use Tailwind utility classes. All shadcn/ui components are pre-configured with the cloud theme.
 
 ### Path Aliases
 
-TypeScript path alias configured in vite.config.ts and tsconfig.json:
+TypeScript path alias configured in `vite.config.ts` and `tsconfig.json`:
 - `@/*` maps to `./src/*`
-- Always use `@/` imports for cleaner imports: `import { Button } from '@/components/ui/button'`
+- Always use `@/` imports: `import { Button } from '@/components/ui/button'`
 
 ### Build Optimization
 
-Vite config includes manual chunk splitting for optimal loading:
+Vite config includes manual chunk splitting in `vite.config.ts`:
 - `react-vendor`: React core libraries
+- `router`: React Router DOM
 - `ui-vendor`: All Radix UI components
 - `animation-vendor`: Framer Motion
 - `chart-vendor`: Recharts
-- `utils-vendor`: Utility libraries (Zustand, lucide-react, etc.)
+- `utils-vendor`: Utility libraries (Zustand, lucide-react, clsx, etc.)
 
 ## Important Patterns
 
-### Working with Stores
+### Working with Supabase in Stores
 
 ```typescript
-// Always get latest state inside actions using get()
-const store = create((set, get) => ({
-  action: () => {
-    const { currentValue } = get(); // Get fresh state
-    // Use currentValue for logic
-  }
-}));
+// Pattern: Get current user, then query with RLS
+const { data: { user } } = await supabase.auth.getUser();
+if (!user) return;
+
+const { data, error } = await supabase
+  .from('table_name')
+  .select('*')
+  .eq('user_id', user.id);
 ```
 
-### Date Handling
+### Date Handling with Supabase
 
-All stores serialize/deserialize dates properly. When loading from localStorage:
+Supabase returns ISO strings for timestamps. Convert to Date objects when loading:
+
 ```typescript
-const stored = JSON.parse(localStorage.getItem(key));
-return stored.map(item => ({
-  ...item,
-  dateField: item.dateField ? new Date(item.dateField) : null
+const records = (data || []).map(row => ({
+  ...row,
+  createdAt: new Date(row.created_at),
+  updatedAt: row.updated_at ? new Date(row.updated_at) : null
 }));
 ```
 
 ### Challenge Day Calculation
 
-Current day is **always** `completedDays.length + 1`, never based on calendar dates. This allows flexible pacing.
+Current day is **always** `completedDays.length + 1`, never based on calendar dates. This allows flexible pacing:
 
-### Community Posts
+```typescript
+calculateCurrentDay: (cohortId) => {
+  const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
+  if (!challenge || challenge.status !== 'active') return 0;
+  return Math.min(challenge.completedDays.length + 1, 30);
+}
+```
 
-- Use `loadAllPosts()` for unified cohort feed (combines all rooms)
-- Use `loadPosts(roomId)` for specific room view
-- Filter by `cohortId` to show only relevant posts for user's cohort
-- Time formatting is handled automatically by `formatTimeAgo()`
+### Community Posts with RLS
 
-## Testing Accounts & Data
+Posts are automatically filtered by cohort based on RLS policies:
 
-- Default test user created on first run: `test@test.com` / `test123` in cohort-1
-- Test cohort-1 created with active challenge
-- LocalStorage keys: `kindness-users`, `kindness-auth`, `kindness-daily-records`, `kindness-surveys`, `community_posts_*`
+```typescript
+// Load all posts for user's cohort (RLS handles filtering)
+const { data } = await supabase
+  .from('community_posts')
+  .select('*, community_comments(*)')
+  .eq('cohort_id', cohortId)
+  .order('created_at', { ascending: false });
+```
+
+### Atomic Updates with RPC
+
+Use RPC functions for operations requiring atomicity:
+
+```typescript
+// Increment likes using stored procedure
+await supabase.rpc('increment_post_likes', { post_id: postId });
+```
+
+## Supabase Migrations
+
+Migrations located in `supabase/migrations/`:
+- `001_initial_schema.sql`: Core tables and RLS policies
+- `002_fix_cohorts_rls.sql`: Cohorts RLS adjustments
+- `003_fix_users_insert_rls.sql`: Users insert policy fix
+- `004_add_code_used_at.sql`: Application code tracking (adds `code_used_at` field)
+- `005_add_applications_rls_and_code_used_at.sql`: Applications RLS policies
+
+Apply migrations via Supabase CLI or dashboard.
+
+**Migration History Context**: The codebase recently completed a full migration from localStorage to Supabase (completed Nov 30, 2025). All stores (challengeStore, dailyRecordStore, surveyStore, applicationStore, communityStore) now persist data in Supabase tables with proper RLS policies.
+
+## Admin System
+
+- **Admin authentication**: Uses Supabase Auth with `is_admin` column in `users` table
+- **Admin dashboard**: `/admin/*` routes (dashboard, users, cohorts, applications, statistics)
+- **Features**: User management, cohort management, application approval, statistics
+- **Code generation**: Automatic 6-character code generation for application approval
+- **RLS policies**: Admin-only access to applications table enforced by `is_admin` flag
+- **Admin setup**: After creating admin account, manually set `is_admin = true` in Supabase Dashboard
 
 ## Common Tasks
 
-**Adding a new page**:
+### Adding a new page
+
 1. Create in `src/pages/`
 2. Add route in `App.tsx` (protected or public)
 3. Add navigation in `BottomNav.tsx` or `DesktopHeader.tsx` if needed
 
-**Adding a new store**:
-1. Create in `src/store/` with Zustand
-2. Include localStorage persistence pattern
-3. Handle date serialization if using dates
-4. Export store hook and types
+### Adding a new Supabase table
 
-**Modifying challenge logic**:
-- Challenge progression logic is in `challengeStore.ts`
-- Stamp display is in `StampBoard.tsx`
-- Daily record submission is in `DailyRecord.tsx` and `dailyRecordStore.ts`
+1. Create migration file in `supabase/migrations/`
+2. Define table schema with RLS policies
+3. Create corresponding TypeScript types in store
+4. Add store methods for CRUD operations
 
-**Working with cohorts**:
-- Cohort data in `cohortStore.ts`
-- User-cohort relationship in `authStore.ts`
+### Modifying challenge logic
+
+- Challenge progression: `challengeStore.ts` (Supabase `challenges` table)
+- Stamp display: `StampBoard.tsx`
+- Daily record submission: `DailyRecord.tsx` + `dailyRecordStore.ts` (Supabase `daily_records` table)
+
+### Working with cohorts
+
+- Cohort data: `cohortStore.ts` (Supabase `cohorts` table)
+- User-cohort relationship: `authStore.ts` (Supabase `user_cohorts` table)
 - Always filter community content by user's `currentCohortId`
+
+## Deployment
+
+- Production deployment on Vercel (config in `vercel.json`)
+- Environment variables set in Vercel dashboard
+- Build command: `npm run build`
+- Output directory: `dist/`

@@ -28,7 +28,7 @@ export default function AdminLogin() {
     }
 
     // 로그인 시도
-    const result = adminLogin(formData.email, formData.password);
+    const result = await adminLogin(formData.email, formData.password);
 
     if (result.success) {
       navigate('/admin/dashboard');
