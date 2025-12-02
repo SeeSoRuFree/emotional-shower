@@ -77,7 +77,8 @@ function App() {
     };
 
     initAuth();
-  }, [checkAuth, checkAdminAuth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Listen for auth state changes (session refresh, logout, etc.)
   useEffect(() => {
@@ -105,7 +106,8 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [checkAuth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // checkAuth is stable, run only once
 
   const handleSplashComplete = () => {
     setShowSplash(false);
