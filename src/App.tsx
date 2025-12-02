@@ -53,7 +53,7 @@ function App() {
       setIsInitializing(true);
       try {
         await checkAuth();
-        checkAdminAuth();
+        await checkAdminAuth();
 
         // For development: Clear onboarding state to test flow
         // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
