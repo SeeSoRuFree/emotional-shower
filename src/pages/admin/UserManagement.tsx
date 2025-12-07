@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, ChevronDown, ChevronUp, Mail, Calendar, User as UserIcon } from 'lucide-react';
 import { useCohortStore } from '@/store/cohortStore';
+import { supabase } from '@/lib/supabase';
 
 interface User {
   id: string;
@@ -17,24 +18,53 @@ export default function UserManagement() {
   const [sortBy, setSortBy] = useState<'name' | 'email' | 'createdAt'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { cohorts } = useCohortStore();
+  const { cohorts, loadCohorts } = useCohortStore();
 
-  // Load users from localStorage
-  const allUsers = useMemo(() => {
-    try {
-      const stored = localStorage.getItem('kindness-users');
-      if (stored) {
-        return JSON.parse(stored).map((user: any) => ({
-          ...user,
-          createdAt: new Date(user.createdAt),
-          cohortHistory: user.cohortHistory || []
+  // Load cohorts from Supabase
+  useEffect(() => {
+    loadCohorts();
+  }, [loadCohorts]);
+
+  // Load users from Supabase
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch all users from Supabase
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Failed to load users:', error);
+          setAllUsers([]);
+          return;
+        }
+
+        const users = (data || []).map((user: any) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          currentCohortId: user.current_cohort_id,
+          cohortHistory: [],  // TODO: user_cohorts 테이블에서 로드
+          createdAt: new Date(user.created_at)
         }));
+
+        setAllUsers(users);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+        setAllUsers([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-    return [];
+    };
+
+    loadUsers();
   }, []);
 
   // Filter and sort users

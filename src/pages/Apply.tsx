@@ -56,14 +56,20 @@ export default function Apply() {
   };
 
   const handleFinalSubmit = async () => {
-    // 신청서 제출 (기수는 어드민이 승인 시 할당)
-    await submitApplication({
-      name: formData.name,
-      email: formData.email,
-      motivation: formData.motivation
-    });
+    try {
+      // 신청서 제출 (기수는 어드민이 승인 시 할당)
+      await submitApplication({
+        name: formData.name,
+        email: formData.email,
+        motivation: formData.motivation
+      });
 
-    setStep('submitted');
+      setStep('submitted');
+    } catch (error) {
+      console.error('Application submission error:', error);
+      // 에러 발생 시 사용자에게 알림
+      alert('신청서 제출 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
 
   return (

@@ -47,23 +47,34 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
   loading: false,
   initialized: false,
 
-  // Supabase에서 신청서 로드
+  // Supabase에서 신청서 로드 (Edge Function 사용)
   loadApplications: async () => {
     try {
       set({ loading: true });
 
-      const { data, error } = await supabase
-        .from('applications')
-        .select('*')
-        .order('applied_at', { ascending: false });
+      // 세션 가져오기
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) {
+      if (!session) {
+        console.error('No session found');
+        set({ loading: false });
+        return;
+      }
+
+      // Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('admin-get-applications', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error || !data || !data.success) {
         console.error('Failed to load applications:', error);
         set({ loading: false });
         return;
       }
 
-      const applications: Application[] = (data || []).map(row => ({
+      const applications: Application[] = (data.applications || []).map((row: any) => ({
         id: row.id,
         name: row.name,
         email: row.email,
@@ -86,79 +97,49 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
   // 신청서 제출 (기수 선택 없음)
   submitApplication: async (data) => {
     try {
-      const { data: newApp, error } = await supabase
+      const { error } = await supabase
         .from('applications')
         .insert({
           name: data.name,
           email: data.email,
           motivation: data.motivation,
           status: 'pending'
-        })
-        .select()
-        .single();
+        });
 
       if (error) {
         console.error('Failed to submit application:', error);
-        return;
+        throw new Error('신청서 제출에 실패했습니다');
       }
 
-      const application: Application = {
-        id: newApp.id,
-        name: newApp.name,
-        email: newApp.email,
-        motivation: newApp.motivation,
-        cohortId: null,
-        status: 'pending',
-        code: null,
-        appliedAt: new Date(newApp.applied_at),
-        processedAt: null,
-        codeUsedAt: null
-      };
-
-      set({ applications: [...get().applications, application] });
+      // Note: SELECT 권한이 어드민에게만 있으므로 로컬 상태 업데이트 생략
+      // 신청서는 어드민 페이지에서만 조회 가능
     } catch (error) {
       console.error('Submit application error:', error);
+      throw error;
     }
   },
 
-  // 신청 승인 (코드 발급 + 기수 할당)
+  // 신청 승인 (Edge Function 사용)
   approveApplication: async (applicationId, cohortId) => {
     try {
-      // 고유한 코드 생성
-      let code = generateCode();
-      let isUnique = false;
+      // 세션 가져오기
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // 코드 중복 확인
-      while (!isUnique) {
-        const { data: existing } = await supabase
-          .from('applications')
-          .select('code')
-          .eq('code', code)
-          .single();
-
-        if (!existing) {
-          isUnique = true;
-        } else {
-          code = generateCode();
-        }
+      if (!session) {
+        throw new Error('로그인이 필요합니다');
       }
 
-      // 신청서 상태 업데이트 (기수 할당)
-      const { data: updated, error } = await supabase
-        .from('applications')
-        .update({
-          status: 'approved',
-          code: code,
-          cohort_id: cohortId,
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', applicationId)
-        .select()
-        .single();
+      // Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('admin-approve', {
+        body: { applicationId, cohortId },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
 
-      if (error) {
+      if (error || !data || !data.success) {
         console.error('Failed to approve application:', error);
-        throw new Error('Failed to approve application');
+        throw new Error(data?.error || '신청서 승인에 실패했습니다');
       }
 
       // 로컬 상태 업데이트
@@ -167,9 +148,9 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
           ? {
               ...app,
               status: 'approved' as const,
-              code,
+              code: data.code,
               cohortId,
-              processedAt: new Date(updated.processed_at)
+              processedAt: new Date()
             }
           : app
       );
@@ -177,27 +158,24 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
       set({ applications: updatedApplications });
 
       // 이메일 발송 시뮬레이션
-      const application = get().applications.find(app => app.id === applicationId);
-      if (application) {
-        console.log(`
+      console.log(`
 📧 이메일 발송 시뮬레이션
 ━━━━━━━━━━━━━━━━━━━━
-To: ${application.email}
+To: ${data.application.email}
 Subject: [정서샤워] 챌린지 승인 안내
 
-안녕하세요 ${application.name}님,
+안녕하세요 ${data.application.name}님,
 
 신청하신 챌린지가 승인되었습니다!
 아래 코드로 회원가입을 진행해주세요.
 
-인증 코드: ${code}
+인증 코드: ${data.code}
 할당 기수: ${cohortId}
 
 감사합니다.
-        `);
-      }
+      `);
 
-      return code;
+      return data.code;
     } catch (error) {
       console.error('Approve application error:', error);
       throw error;
@@ -232,49 +210,30 @@ Subject: [정서샤워] 챌린지 승인 안내
     }
   },
 
-  // 코드 검증
+  // 코드 검증 (Edge Function 사용)
   verifyCode: async (code) => {
     try {
       const upperCode = code.toUpperCase();
 
-      // TEST01 코드의 경우, cohortStore에서 실제 UUID 가져오기
-      if (upperCode === 'TEST01') {
-        try {
-          const cohortStore = useCohortStore.getState();
-          const actualCohortId = await cohortStore.ensureTestCohort();
+      // Edge Function 호출
+      const { data, error } = await supabase.functions.invoke('verify-code', {
+        body: { code: upperCode }
+      });
 
-          return {
-            valid: true,
-            cohortId: actualCohortId,
-            applicationId: 'test-application'
-          };
-        } catch (error) {
-          console.error('Failed to get test cohort UUID:', error);
-          return { valid: false };
-        }
-      }
-
-      // Supabase에서 코드 검증
-      const { data, error } = await supabase
-        .from('applications')
-        .select('*')
-        .eq('code', upperCode)
-        .eq('status', 'approved')
-        .single();
-
-      if (error || !data) {
+      if (error) {
+        console.error('Edge Function error:', error);
         return { valid: false };
       }
 
-      // 이미 사용된 코드인지 확인
-      if (data.code_used_at) {
+      // Edge Function 응답 처리
+      if (!data || !data.valid) {
         return { valid: false };
       }
 
       return {
         valid: true,
-        cohortId: data.cohort_id,
-        applicationId: data.id
+        cohortId: data.cohortId,
+        applicationId: data.applicationId
       };
     } catch (error) {
       console.error('Verify code error:', error);

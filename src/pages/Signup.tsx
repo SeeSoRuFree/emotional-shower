@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { UserPlus, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { UserPlus, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import SkyBackground from '@/components/cloud/SkyBackground';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useChallengeStore } from '@/store/challengeStore';
@@ -20,6 +20,7 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
 
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
   const { signup } = useAuthStore();
@@ -74,21 +75,25 @@ export default function Signup() {
 
     try {
       // 1. 코드 검증 (async - cohortStore에서 실제 UUID 가져옴)
+      setLoadingStep('코드 확인 중...');
       const codeResult = await verifyCode(formData.code);
 
       if (!codeResult.valid) {
         setErrors({ code: '유효하지 않거나 이미 사용된 코드입니다' });
         setIsLoading(false);
+        setLoadingStep('');
         return;
       }
 
       if (!codeResult.cohortId) {
         setErrors({ code: '코드에 연결된 기수 정보가 없습니다' });
         setIsLoading(false);
+        setLoadingStep('');
         return;
       }
 
       // 2. 회원가입 (Supabase Auth)
+      setLoadingStep('계정 생성 중...');
       const signupResult = await signup({
         name: formData.name,
         email: formData.email,
@@ -99,10 +104,12 @@ export default function Signup() {
       if (!signupResult.success) {
         setErrors({ email: signupResult.error || '회원가입에 실패했습니다' });
         setIsLoading(false);
+        setLoadingStep('');
         return;
       }
 
       // 3. 코드 사용 처리
+      setLoadingStep('챌린지 등록 중...');
       await markCodeAsUsed(formData.code);
 
       // 4. 챌린지 자동 신청 (approved 상태로)
@@ -114,12 +121,15 @@ export default function Signup() {
       localStorage.setItem('hasCompletedOnboarding', 'true');
 
       // 6. Home으로 이동 (사전 설문 버튼 보임)
+      setLoadingStep('완료!');
       setIsLoading(false);
+      setLoadingStep('');
       navigate('/home');
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ email: '회원가입 중 오류가 발생했습니다' });
       setIsLoading(false);
+      setLoadingStep('');
     }
   };
 
@@ -318,13 +328,18 @@ export default function Signup() {
 
           {/* Signup Button */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: isLoading ? 1 : 1.02 }}
+            whileTap={{ scale: isLoading ? 1 : 0.98 }}
             onClick={handleSignup}
             disabled={isLoading}
-            className="mt-6 w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-6 w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {isLoading ? '처리 중...' : '회원가입'}
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {loadingStep || '처리 중...'}
+              </span>
+            ) : '회원가입'}
           </motion.button>
 
           {/* Divider */}

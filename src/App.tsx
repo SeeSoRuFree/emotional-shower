@@ -48,23 +48,27 @@ function App() {
   const { isAdminLoggedIn, checkAdminAuth } = useAdminAuthStore();
 
   useEffect(() => {
+    let cancelled = false;
+
     // Check auth status (async)
     const initAuth = async () => {
+      if (cancelled) return;
+
       setIsInitializing(true);
       try {
-        await checkAuth();
-        await checkAdminAuth();
+        // Execute both auth checks independently to prevent one from blocking the other
+        await Promise.all([
+          checkAuth().catch(err => {
+            console.error('User auth check failed:', err);
+            // Don't throw - allow admin auth to proceed
+          }),
+          checkAdminAuth().catch(err => {
+            console.error('Admin auth check failed:', err);
+            // Don't throw - allow user auth to proceed
+          })
+        ]);
 
-        // For development: Clear onboarding state to test flow
-        // COMMENTED OUT FOR PRODUCTION DEPLOYMENT
-        // localStorage.removeItem('hasCompletedOnboarding');
-        // localStorage.removeItem('isLoggedIn');
-        // localStorage.removeItem('loginMethod');
-        // localStorage.removeItem('kindness-challenge');
-        // localStorage.removeItem('kindness-daily-records');
-        // localStorage.removeItem('kindness-surveys');
-        // localStorage.removeItem('kindness-users');
-        // localStorage.removeItem('kindness-auth');
+        if (cancelled) return;
 
         // Check if user has completed onboarding
         const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
@@ -72,11 +76,18 @@ function App() {
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {
-        setIsInitializing(false);
+        if (!cancelled) {
+          setIsInitializing(false);
+        }
       }
     };
 
     initAuth();
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
@@ -86,6 +97,12 @@ function App() {
       async (event, session) => {
         console.log('Auth state changed:', event);
 
+        // 초기화 중에는 이벤트 무시 (첫 번째 useEffect에서 이미 처리)
+        if (isInitializing) {
+          console.log('Skipping auth event during initialization');
+          return;
+        }
+
         if (event === 'SIGNED_OUT') {
           // User signed out - could be from another tab or session expiry
           // The authStore logout will handle state cleanup
@@ -94,10 +111,16 @@ function App() {
           console.log('Session token refreshed');
         } else if (event === 'USER_UPDATED') {
           // User data was updated
-          await checkAuth();
+          await Promise.all([
+            checkAuth().catch(err => console.error('User auth check failed:', err)),
+            checkAdminAuth().catch(err => console.error('Admin auth check failed:', err))
+          ]);
         } else if (event === 'SIGNED_IN') {
           // User signed in (could be from another tab)
-          await checkAuth();
+          await Promise.all([
+            checkAuth().catch(err => console.error('User auth check failed:', err)),
+            checkAdminAuth().catch(err => console.error('Admin auth check failed:', err))
+          ]);
         }
       }
     );
@@ -107,7 +130,7 @@ function App() {
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // checkAuth is stable, run only once
+  }, [isInitializing]); // isInitializing 의존성 추가
 
   const handleSplashComplete = () => {
     setShowSplash(false);

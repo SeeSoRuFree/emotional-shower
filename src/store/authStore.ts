@@ -230,10 +230,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   // 인증 상태 확인 (앱 시작 시)
   checkAuth: async () => {
-    try {
+    const AUTH_TIMEOUT = 10000; // 10초 timeout
+
+    const authCheck = async () => {
+      console.log('[checkAuth] 시작');
       set({ loading: true });
 
+      console.log('[checkAuth] getSession 호출');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[checkAuth] getSession 완료:', !!session);
 
       if (!session) {
         set({ currentUser: null, isLoggedIn: false, loading: false });
@@ -241,11 +246,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
 
       // users 테이블에서 프로필 가져오기
+      console.log('[checkAuth] users 테이블 쿼리 시작');
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', session.user.id)
         .single();
+      console.log('[checkAuth] users 테이블 쿼리 완료:', !!profile, profileError?.message);
 
       if (profileError || !profile) {
         set({ currentUser: null, isLoggedIn: false, loading: false });
@@ -274,8 +281,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       };
 
       set({ currentUser, isLoggedIn: true, loading: false });
+      console.log('[checkAuth] 완료');
+    };
+
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('Auth check timeout')), AUTH_TIMEOUT)
+    );
+
+    try {
+      await Promise.race([authCheck(), timeoutPromise]);
     } catch (error) {
-      console.error('Check auth error:', error);
+      console.error('Check auth error or timeout:', error);
       set({ currentUser: null, isLoggedIn: false, loading: false });
     }
   },

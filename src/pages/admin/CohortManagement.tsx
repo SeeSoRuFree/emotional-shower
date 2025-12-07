@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Calendar, Users, X } from 'lucide-react';
 import { useCohortStore } from '@/store/cohortStore';
 import type { Cohort } from '@/store/cohortStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CohortManagement() {
-  const { cohorts, createCohort, updateCohort, deleteCohort } = useCohortStore();
+  const { cohorts, loadCohorts, createCohort, updateCohort, deleteCohort } = useCohortStore();
+
+  // Load cohorts from Supabase on mount
+  useEffect(() => {
+    loadCohorts();
+  }, [loadCohorts]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCohort, setEditingCohort] = useState<Cohort | null>(null);

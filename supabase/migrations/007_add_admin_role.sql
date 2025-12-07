@@ -11,10 +11,18 @@ CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin) WHERE is_admin 
 -- Update RLS policies for applications table
 DROP POLICY IF EXISTS "Anyone can view applications (TEMP)" ON applications;
 DROP POLICY IF EXISTS "Anyone can update applications (TEMP)" ON applications;
+DROP POLICY IF EXISTS "Anyone can insert applications" ON applications;
 DROP POLICY IF EXISTS "Only admins can view applications" ON applications;
+DROP POLICY IF EXISTS "Anyone can verify approved code" ON applications;
 DROP POLICY IF EXISTS "Only admins can update applications" ON applications;
 
--- Policy: Only admins can view applications
+-- Policy: Anyone can insert applications (신청서 제출)
+CREATE POLICY "Anyone can insert applications"
+  ON applications FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- Policy: Only admins can view all applications (어드민 전용)
 CREATE POLICY "Only admins can view applications"
   ON applications FOR SELECT
   TO authenticated
@@ -25,6 +33,12 @@ CREATE POLICY "Only admins can view applications"
       AND users.is_admin = true
     )
   );
+
+-- Policy: Anyone can verify approved code (코드 검증용)
+CREATE POLICY "Anyone can verify approved code"
+  ON applications FOR SELECT
+  TO anon, authenticated
+  USING (status = 'approved');
 
 -- Policy: Only admins can update applications
 CREATE POLICY "Only admins can update applications"
