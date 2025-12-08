@@ -9,7 +9,10 @@ import {
   LogOut,
   Menu,
   X,
-  Shield
+  Shield,
+  ClipboardList,
+  BookOpen,
+  MessageSquare
 } from 'lucide-react';
 import { useAdminAuthStore } from '@/store/adminAuthStore';
 
@@ -18,6 +21,9 @@ const menuItems = [
   { id: 'users', label: '사용자 관리', icon: Users, path: '/admin/users' },
   { id: 'cohorts', label: '기수 관리', icon: Calendar, path: '/admin/cohorts' },
   { id: 'applications', label: '신청 관리', icon: FileText, path: '/admin/applications' },
+  { id: 'surveys', label: '설문 관리', icon: ClipboardList, path: '/admin/surveys' },
+  { id: 'records', label: '기록 관리', icon: BookOpen, path: '/admin/records' },
+  { id: 'community', label: '커뮤니티', icon: MessageSquare, path: '/admin/community' },
   { id: 'statistics', label: '통계', icon: BarChart3, path: '/admin/statistics' },
 ];
 

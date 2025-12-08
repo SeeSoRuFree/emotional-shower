@@ -117,9 +117,9 @@ export default function PostSurvey() {
   const isAllAnswered = Object.keys(responses).length === totalQuestions;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-purple via-white to-headspace-pastel-blue">
+    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-purple via-white to-headspace-pastel-blue md:pt-16">
       {/* Header */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur shadow-soft z-20">
+      <div className="sticky top-0 md:top-16 bg-white/90 backdrop-blur shadow-soft z-20">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <button

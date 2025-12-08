@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
@@ -99,30 +99,21 @@ export default function PreSurvey() {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
 
-  // Load saved progress on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('pre-survey-progress');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setAnswers(parsed);
-      } catch (error) {
-        console.error('Failed to load survey progress:', error);
-      }
-    }
-  }, []);
-
-  // Auto-save to localStorage whenever answers change
-  useEffect(() => {
-    if (Object.keys(answers).length > 0) {
-      localStorage.setItem('pre-survey-progress', JSON.stringify(answers));
-    }
-  }, [answers]);
-
   const currentSection = SURVEY_SECTIONS[currentSectionIndex];
   const totalQuestions = SURVEY_SECTIONS.reduce((acc, s) => acc + s.questions.length, 0);
   const answeredQuestions = Object.keys(answers).length;
   const progressPercentage = Math.round((answeredQuestions / totalQuestions) * 100);
+
+  // 테스트용: 모든 문항 자동 채우기
+  const handleAutoFill = () => {
+    const allAnswers: Record<string, number> = {};
+    SURVEY_SECTIONS.forEach(section => {
+      section.questions.forEach(q => {
+        allAnswers[q.id] = Math.floor(Math.random() * 5) + 1; // 1-5 랜덤
+      });
+    });
+    setAnswers(allAnswers);
+  };
 
   const isSectionComplete = () => {
     return currentSection.questions.every(q => answers[q.id] !== undefined);
@@ -165,17 +156,15 @@ export default function PreSurvey() {
     // 사전 설문 = DAY 1 완료 처리
     await completeDay(cohortId, 1);
 
-    localStorage.removeItem('pre-survey-progress');
-
     // 홈으로 이동 (DAY 2 시작)
     navigate('/home');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-blue via-white to-headspace-pastel-green">
+    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-blue via-white to-headspace-pastel-green md:pt-16">
       {/* Progress Bar */}
       {step !== 'intro' && (
-        <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-10">
+        <div className="fixed top-0 md:top-16 left-0 right-0 bg-white shadow-sm z-10">
           <div className="max-w-lg mx-auto px-6 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-headspace-darkGray">
@@ -256,6 +245,19 @@ export default function PreSurvey() {
                 >
                   시작하기
                   <ArrowRight className="w-5 h-5" />
+                </motion.button>
+
+                {/* 테스트용 자동 채우기 버튼 */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    handleAutoFill();
+                    setStep('outro');
+                  }}
+                  className="w-full py-3 mt-3 bg-gray-200 text-gray-600 rounded-full font-medium text-sm"
+                >
+                  🧪 테스트: 전체 자동 입력 후 완료
                 </motion.button>
               </motion.div>
             )}

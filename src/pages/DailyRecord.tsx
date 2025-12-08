@@ -190,10 +190,10 @@ export default function DailyRecord() {
   };
 
   return (
-    <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col">
+    <SkyBackground timeOfDay="day" cloudDensity="low" className="flex flex-col md:pt-16">
       <div className="flex-1 flex flex-col pb-24">
         {/* Header */}
-        <div className="sticky top-0 bg-white/90 backdrop-blur shadow-soft z-20">
+        <div className="sticky top-0 md:top-16 bg-white/90 backdrop-blur shadow-soft z-20">
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
               <button

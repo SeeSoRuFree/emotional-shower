@@ -106,7 +106,7 @@ export default function Community() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white relative overflow-hidden md:pt-16">
       {/* 배경 애니메이션 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(3)].map((_, i) => (
@@ -118,7 +118,7 @@ export default function Community() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 bg-white/80 backdrop-blur-sm shadow-soft"
+        className="relative z-10 bg-white/80 backdrop-blur-sm shadow-soft md:sticky md:top-16"
       >
         <div className="p-6 text-center">
           <motion.div

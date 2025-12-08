@@ -5,7 +5,6 @@ import SkyBackground from '@/components/cloud/SkyBackground';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useCohortStore } from '@/store/cohortStore';
 import { useAuthStore } from '@/store/authStore';
-import { loadAllPosts } from '@/utils/communityStorage';
 import type { Application } from '@/store/applicationStore';
 import type { Cohort } from '@/store/cohortStore';
 

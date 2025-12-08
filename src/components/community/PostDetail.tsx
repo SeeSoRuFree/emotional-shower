@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Heart, Send, Sparkles } from 'lucide-react';
-import { getPost, addComment, togglePostLike, toggleCommentLike } from '@/utils/communityStorage';
-import type { Post } from '@/utils/communityStorage';
+import { useCommunityStore, type Post } from '@/store/communityStore';
+import { useAuthStore } from '@/store/authStore';
 import BottomNav from '@/components/common/BottomNav';
 
 // 커뮤니티 룸 정보
@@ -43,20 +43,31 @@ const communityRooms = {
 export default function PostDetail() {
   const { roomId, postId } = useParams<{ roomId: string; postId: string }>();
   const navigate = useNavigate();
-  
+
+  const { currentUser } = useAuthStore();
+  const { posts, loadPosts, addComment: addCommentToPost, incrementPostLikes, incrementCommentLikes } = useCommunityStore();
+
   const [post, setPost] = useState<Post | null>(null);
   const [commentContent, setCommentContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const currentRoom = roomId ? communityRooms[roomId as keyof typeof communityRooms] : null;
-  
+  const cohortId = currentUser?.currentCohortId;
+
   // 게시글 로드
   useEffect(() => {
-    if (roomId && postId) {
-      const loadedPost = getPost(roomId, postId);
-      setPost(loadedPost);
+    if (cohortId && roomId) {
+      loadPosts(cohortId, roomId);
     }
-  }, [roomId, postId]);
+  }, [cohortId, roomId, loadPosts]);
+
+  // posts가 업데이트되면 현재 게시글 찾기
+  useEffect(() => {
+    if (postId && posts.length > 0) {
+      const foundPost = posts.find(p => p.id === postId);
+      setPost(foundPost || null);
+    }
+  }, [postId, posts]);
   
   // 게시글을 찾지 못한 경우
   if (!post || !currentRoom) {
@@ -76,38 +87,27 @@ export default function PostDetail() {
   }
   
   // 좋아요 토글
-  const handlePostLike = () => {
-    if (roomId && postId) {
-      togglePostLike(roomId, postId);
-      // 게시글 다시 로드
-      const updatedPost = getPost(roomId, postId);
-      setPost(updatedPost);
+  const handlePostLike = async () => {
+    if (postId) {
+      await incrementPostLikes(postId);
     }
   };
-  
+
   // 댓글 좋아요 토글
-  const handleCommentLike = (commentId: string) => {
-    if (roomId && postId) {
-      toggleCommentLike(roomId, postId, commentId);
-      // 게시글 다시 로드
-      const updatedPost = getPost(roomId, postId);
-      setPost(updatedPost);
-    }
+  const handleCommentLike = async (commentId: string) => {
+    await incrementCommentLikes(commentId);
   };
-  
+
   // 댓글 작성
   const handleSubmitComment = async () => {
-    if (!commentContent.trim() || !roomId || !postId || isSubmitting) return;
-    
+    if (!commentContent.trim() || !postId || isSubmitting) return;
+
     setIsSubmitting(true);
-    
+
     try {
-      const success = addComment(roomId, postId, commentContent);
+      const success = await addCommentToPost(postId, commentContent);
       if (success) {
         setCommentContent('');
-        // 게시글 다시 로드
-        const updatedPost = getPost(roomId, postId);
-        setPost(updatedPost);
       }
     } catch (error) {
       console.error('Failed to add comment:', error);

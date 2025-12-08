@@ -93,7 +93,7 @@ export default function Profile() {
   const currentStreak = calculateStreak();
 
   const handleLogout = () => {
-    if (confirm('정말 로그아웃하시겠어요? 모든 데이터는 브라우저에 안전하게 저장됩니다.')) {
+    if (confirm('정말 로그아웃하시겠어요? 모든 데이터는 안전하게 클라우드에 저장되어 있습니다.')) {
       logout();
       navigate('/login');
     }
@@ -115,8 +115,8 @@ export default function Profile() {
 
   if (showSettings) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white">
-        <div className="sticky top-0 bg-white/90 backdrop-blur shadow-soft z-20">
+      <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white md:pt-16">
+        <div className="sticky top-0 md:top-16 bg-white/90 backdrop-blur shadow-soft z-20">
           <div className="p-6">
             <div className="flex items-center justify-between">
               <button
@@ -200,9 +200,9 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white">
+    <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white md:pt-16">
       {/* Header */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur shadow-soft z-20">
+      <div className="sticky top-0 md:top-16 bg-white/90 backdrop-blur shadow-soft z-20">
         <div className="p-6">
           <div className="flex items-center justify-between">
             <div>

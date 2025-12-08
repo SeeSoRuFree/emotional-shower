@@ -9,6 +9,19 @@ export interface CohortParticipation {
   status: 'active' | 'completed' | 'failed';
 }
 
+// 온보딩 설정
+export interface OnboardingPreferences {
+  intentions: string[];
+  customIntention?: string;
+  conversationTone: 'warm' | 'honest' | 'bright' | 'neutral' | null;
+  practiceWeather: 'sunny' | 'cloudy' | 'rainy' | null;
+  practiceEmotions: string[];
+  conversationMethod: 'voice' | 'text' | null;
+  endingRoutine: 'music' | 'book' | 'sleep' | null;
+  currentStep: number;
+  isCompleted: boolean;
+}
+
 // 회원 정보
 export interface User {
   id: string;
@@ -17,6 +30,8 @@ export interface User {
   currentCohortId: string | null;
   cohortHistory: CohortParticipation[];
   createdAt: Date;
+  hasCompletedOnboarding: boolean;
+  onboardingPreferences: OnboardingPreferences | null;
 }
 
 interface AuthStore {
@@ -32,6 +47,10 @@ interface AuthStore {
   joinCohort: (cohortId: string) => Promise<{ success: boolean; error?: string }>;
   completeCohort: (cohortId: string, status: 'completed' | 'failed') => Promise<void>;
   hasActiveCohort: () => boolean;
+
+  // Onboarding
+  updateOnboardingPreferences: (preferences: OnboardingPreferences) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 // Supabase 에러를 한국어로 변환
@@ -142,7 +161,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           completedAt: ch.completed_at ? new Date(ch.completed_at) : null,
           status: ch.status as 'active' | 'completed' | 'failed'
         })) || [],
-        createdAt: new Date()
+        createdAt: new Date(),
+        hasCompletedOnboarding: false,
+        onboardingPreferences: null
       };
 
       set({ currentUser, isLoggedIn: true, loading: false });
@@ -206,7 +227,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           completedAt: ch.completed_at ? new Date(ch.completed_at) : null,
           status: ch.status as 'active' | 'completed' | 'failed'
         })) || [],
-        createdAt: new Date(profile.created_at)
+        createdAt: new Date(profile.created_at),
+        hasCompletedOnboarding: profile.has_completed_onboarding || false,
+        onboardingPreferences: profile.onboarding_preferences || null
       };
 
       set({ currentUser, isLoggedIn: true, loading: false });
@@ -277,7 +300,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           completedAt: ch.completed_at ? new Date(ch.completed_at) : null,
           status: ch.status as 'active' | 'completed' | 'failed'
         })) || [],
-        createdAt: new Date(profile.created_at)
+        createdAt: new Date(profile.created_at),
+        hasCompletedOnboarding: profile.has_completed_onboarding || false,
+        onboardingPreferences: profile.onboarding_preferences || null
       };
 
       set({ currentUser, isLoggedIn: true, loading: false });
@@ -411,5 +436,59 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!currentUser) return false;
 
     return currentUser.cohortHistory.some(ch => ch.status === 'active');
+  },
+
+  // 온보딩 설정 업데이트
+  updateOnboardingPreferences: async (preferences) => {
+    const { currentUser } = get();
+    if (!currentUser) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ onboarding_preferences: preferences })
+        .eq('id', currentUser.id);
+
+      if (error) {
+        console.error('Update onboarding preferences error:', error);
+        return;
+      }
+
+      set({
+        currentUser: {
+          ...currentUser,
+          onboardingPreferences: preferences
+        }
+      });
+    } catch (error) {
+      console.error('Update onboarding preferences error:', error);
+    }
+  },
+
+  // 온보딩 완료 처리
+  completeOnboarding: async () => {
+    const { currentUser } = get();
+    if (!currentUser) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ has_completed_onboarding: true })
+        .eq('id', currentUser.id);
+
+      if (error) {
+        console.error('Complete onboarding error:', error);
+        return;
+      }
+
+      set({
+        currentUser: {
+          ...currentUser,
+          hasCompletedOnboarding: true
+        }
+      });
+    } catch (error) {
+      console.error('Complete onboarding error:', error);
+    }
   }
 }));

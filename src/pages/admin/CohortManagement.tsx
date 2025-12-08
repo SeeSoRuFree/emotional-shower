@@ -2,15 +2,35 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Calendar, Users, X } from 'lucide-react';
 import { useCohortStore } from '@/store/cohortStore';
 import type { Cohort } from '@/store/cohortStore';
+import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CohortManagement() {
   const { cohorts, loadCohorts, createCohort, updateCohort, deleteCohort } = useCohortStore();
+  const [userCounts, setUserCounts] = useState<Record<string, number>>({});
 
-  // Load cohorts from Supabase on mount
+  // Load cohorts and user counts from Supabase on mount
   useEffect(() => {
     loadCohorts();
+    loadUserCounts();
   }, [loadCohorts]);
+
+  // Load user counts for each cohort from Supabase
+  const loadUserCounts = async () => {
+    try {
+      const { data } = await supabase
+        .from('user_cohorts')
+        .select('cohort_id');
+
+      const counts: Record<string, number> = {};
+      data?.forEach(row => {
+        counts[row.cohort_id] = (counts[row.cohort_id] || 0) + 1;
+      });
+      setUserCounts(counts);
+    } catch (error) {
+      console.error('Failed to load user counts:', error);
+    }
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCohort, setEditingCohort] = useState<Cohort | null>(null);
@@ -23,20 +43,6 @@ export default function CohortManagement() {
     maxParticipants: '',
     recordType: 'both' as 'both' | 'self_care_only' | 'kindness_only'
   });
-
-  // Load user counts for each cohort
-  const getUserCount = (cohortId: string) => {
-    try {
-      const stored = localStorage.getItem('kindness-users');
-      if (stored) {
-        const users = JSON.parse(stored);
-        return users.filter((u: any) => u.currentCohortId === cohortId).length;
-      }
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-    return 0;
-  };
 
   const handleOpenModal = (cohort?: Cohort) => {
     if (cohort) {
@@ -146,7 +152,7 @@ export default function CohortManagement() {
                 </tr>
               ) : (
                 cohorts.map((cohort) => {
-                  const userCount = getUserCount(cohort.id);
+                  const userCount = userCounts[cohort.id] || 0;
                   return (
                     <tr key={cohort.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-3 px-4">

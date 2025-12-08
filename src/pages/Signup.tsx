@@ -23,7 +23,7 @@ export default function Signup() {
   const [loadingStep, setLoadingStep] = useState('');
 
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
-  const { signup } = useAuthStore();
+  const { signup, completeOnboarding } = useAuthStore();
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -117,8 +117,8 @@ export default function Signup() {
       await challengeStore.applyChallenge(codeResult.cohortId);
       await challengeStore.approveChallenge(codeResult.cohortId);
 
-      // 5. 온보딩 완료 처리
-      localStorage.setItem('hasCompletedOnboarding', 'true');
+      // 5. 온보딩 완료 처리 (Supabase에 저장)
+      await completeOnboarding();
 
       // 6. Home으로 이동 (사전 설문 버튼 보임)
       setLoadingStep('완료!');

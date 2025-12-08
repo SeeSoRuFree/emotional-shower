@@ -152,9 +152,9 @@ export default function Report() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-yellow via-white to-headspace-pastel-pink">
+    <div className="min-h-screen bg-gradient-to-b from-headspace-pastel-yellow via-white to-headspace-pastel-pink md:pt-16">
       {/* Header */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur shadow-soft z-20">
+      <div className="sticky top-0 md:top-16 bg-white/90 backdrop-blur shadow-soft z-20">
         <div className="p-6">
           <div className="flex items-center justify-between">
             <button

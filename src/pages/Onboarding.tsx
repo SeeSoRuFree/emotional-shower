@@ -9,7 +9,7 @@ type OnboardingStep = 'welcome' | 'intro' | 'consent';
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { currentUser } = useAuthStore();
+  const { currentUser, completeOnboarding } = useAuthStore();
   const cohortId = currentUser?.currentCohortId;
 
   const { getCohortById } = useCohortStore();
@@ -18,9 +18,9 @@ export default function Onboarding() {
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [agreed, setAgreed] = useState(false);
 
-  const handleSubmit = () => {
-    // 온보딩 완료 표시
-    localStorage.setItem('hasCompletedOnboarding', 'true');
+  const handleSubmit = async () => {
+    // 온보딩 완료 표시 (Supabase에 저장)
+    await completeOnboarding();
     // 사전 설문으로 이동
     navigate('/pre-survey');
   };

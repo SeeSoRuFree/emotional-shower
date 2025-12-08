@@ -5,6 +5,7 @@ import { KeyRound, AlertCircle } from 'lucide-react';
 import SkyBackground from '@/components/cloud/SkyBackground';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useChallengeStore } from '@/store/challengeStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function CodeVerify() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function CodeVerify() {
   const [isLoading, setIsLoading] = useState(false);
 
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
+  const { completeOnboarding } = useAuthStore();
 
   const handleVerify = () => {
     if (code.length !== 6) {
@@ -47,8 +49,8 @@ export default function CodeVerify() {
       await challengeStore.applyChallenge(result.cohortId);
       await challengeStore.approveChallenge(result.cohortId);
 
-      // 온보딩 완료 처리
-      localStorage.setItem('hasCompletedOnboarding', 'true');
+      // 온보딩 완료 처리 (Supabase에 저장)
+      await completeOnboarding();
 
       // Home으로 이동 (사전 설문 버튼 보임)
       setIsLoading(false);

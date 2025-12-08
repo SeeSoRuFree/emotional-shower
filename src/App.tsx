@@ -20,7 +20,6 @@ import Report from '@/pages/Report';
 import Signup from '@/pages/Signup';
 import Login from '@/pages/Login';
 import Apply from '@/pages/Apply';
-import Admin from '@/pages/Admin';
 import Onboarding from '@/pages/Onboarding';
 
 // Admin pages
@@ -30,6 +29,9 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import UserManagement from '@/pages/admin/UserManagement';
 import CohortManagement from '@/pages/admin/CohortManagement';
 import ApplicationManagement from '@/pages/admin/ApplicationManagement';
+import SurveyManagement from '@/pages/admin/SurveyManagement';
+import DailyRecordManagement from '@/pages/admin/DailyRecordManagement';
+import CommunityManagement from '@/pages/admin/CommunityManagement';
 import Statistics from '@/pages/admin/Statistics';
 
 // Error pages
@@ -42,7 +44,6 @@ import { useAdminAuthStore } from '@/store/adminAuthStore';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const { isLoggedIn, checkAuth } = useAuthStore();
   const { isAdminLoggedIn, checkAdminAuth } = useAdminAuthStore();
@@ -69,10 +70,7 @@ function App() {
         ]);
 
         if (cancelled) return;
-
-        // Check if user has completed onboarding
-        const completedOnboarding = localStorage.getItem('hasCompletedOnboarding');
-        setHasCompletedOnboarding(!!completedOnboarding);
+        // hasCompletedOnboarding is now read from authStore.currentUser
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {
@@ -93,35 +91,27 @@ function App() {
 
   // Listen for auth state changes (session refresh, logout, etc.)
   useEffect(() => {
+    // 초기화 완료 전에는 구독하지 않음
+    if (isInitializing) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event, _session) => {
         console.log('Auth state changed:', event);
 
-        // 초기화 중에는 이벤트 무시 (첫 번째 useEffect에서 이미 처리)
-        if (isInitializing) {
-          console.log('Skipping auth event during initialization');
-          return;
-        }
-
+        // SIGNED_OUT: 로그아웃 시 상태 초기화
         if (event === 'SIGNED_OUT') {
-          // User signed out - could be from another tab or session expiry
-          // The authStore logout will handle state cleanup
-        } else if (event === 'TOKEN_REFRESHED') {
-          // Session token was refreshed successfully
-          console.log('Session token refreshed');
-        } else if (event === 'USER_UPDATED') {
-          // User data was updated
-          await Promise.all([
-            checkAuth().catch(err => console.error('User auth check failed:', err)),
-            checkAdminAuth().catch(err => console.error('Admin auth check failed:', err))
-          ]);
-        } else if (event === 'SIGNED_IN') {
-          // User signed in (could be from another tab)
+          useAuthStore.setState({ currentUser: null, isLoggedIn: false });
+          useAdminAuthStore.setState({ isAdminLoggedIn: false, adminEmail: null, adminId: null });
+        }
+        // USER_UPDATED: 사용자 정보 변경 시에만 재검증
+        else if (event === 'USER_UPDATED') {
           await Promise.all([
             checkAuth().catch(err => console.error('User auth check failed:', err)),
             checkAdminAuth().catch(err => console.error('Admin auth check failed:', err))
           ]);
         }
+        // TOKEN_REFRESHED, SIGNED_IN: 토큰 갱신/로그인은 이미 처리됨, 추가 작업 불필요
+        // INITIAL_SESSION: 초기화 시점에 이미 처리됨
       }
     );
 
@@ -130,7 +120,7 @@ function App() {
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitializing]); // isInitializing 의존성 추가
+  }, [isInitializing]); // isInitializing이 false가 되면 구독 시작
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -182,6 +172,9 @@ function App() {
             <Route path="users" element={<UserManagement />} />
             <Route path="cohorts" element={<CohortManagement />} />
             <Route path="applications" element={<ApplicationManagement />} />
+            <Route path="surveys" element={<SurveyManagement />} />
+            <Route path="records" element={<DailyRecordManagement />} />
+            <Route path="community" element={<CommunityManagement />} />
             <Route path="statistics" element={<Statistics />} />
             <Route index element={<Navigate to="/admin/dashboard" />} />
           </Route>

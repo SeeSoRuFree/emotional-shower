@@ -31,9 +31,9 @@ interface DailyRecordStore {
   getTodayRecord: (day: number) => DailyRecord | undefined;
   addSelfCareAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
   addKindnessAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
-  updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => void;
-  updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => void;
-  removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => void;
+  updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => Promise<void>;
+  updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => Promise<void>;
+  removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => Promise<void>;
   completeRecord: (day: number, quote: string) => Promise<void>;
   getRecordByDay: (day: number) => DailyRecord | undefined;
   getTopActions: (type: 'selfCare' | 'kindness', limit?: number) => { label: string; count: number }[];
@@ -298,53 +298,169 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
     }
   },
 
-  // 행동에 메모 추가/수정 (동기 - 로컬 상태만 업데이트)
-  updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => {
-    const { records } = get();
-    const record = records.find(r => r.day === day);
-    if (!record) return;
+  // 행동에 메모 추가/수정 (Supabase 동기화)
+  updateActionMemo: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const actions = actionType === 'selfCare' ? record.selfCareActions : record.kindnessActions;
-    const action = actions.find(a => a.id === actionId);
-    if (action) {
-      action.memo = memo;
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const { records } = get();
+      const record = records.find(r => r.day === day);
+      if (!record) return;
+
+      // 로컬 상태 업데이트
+      const updatedActions = actionType === 'selfCare'
+        ? record.selfCareActions.map(a => a.id === actionId ? { ...a, memo } : a)
+        : record.kindnessActions.map(a => a.id === actionId ? { ...a, memo } : a);
+
+      const updateField = actionType === 'selfCare' ? 'self_care_actions' : 'kindness_actions';
+
+      // Supabase 업데이트
+      const { error } = await supabase
+        .from('daily_records')
+        .update({ [updateField]: updatedActions })
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id)
+        .eq('day', day);
+
+      if (error) {
+        console.error('Failed to update action memo:', error);
+        return;
+      }
+
+      // 로컬 상태 반영
+      const updatedRecords = records.map(r =>
+        r.day === day
+          ? {
+              ...r,
+              ...(actionType === 'selfCare'
+                ? { selfCareActions: updatedActions }
+                : { kindnessActions: updatedActions })
+            }
+          : r
+      );
+      set({ records: updatedRecords });
+    } catch (error) {
+      console.error('Update action memo error:', error);
     }
-
-    const updatedRecords = [...records];
-    set({ records: updatedRecords });
   },
 
-  // 행동 전체 업데이트 (제목 + 메모) (동기 - 로컬 상태만 업데이트)
-  updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => {
-    const { records } = get();
-    const record = records.find(r => r.day === day);
-    if (!record) return;
+  // 행동 전체 업데이트 (제목 + 메모) (Supabase 동기화)
+  updateAction: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const actions = actionType === 'selfCare' ? record.selfCareActions : record.kindnessActions;
-    const action = actions.find(a => a.id === actionId);
-    if (action) {
-      action.label = newLabel;
-      action.memo = newMemo;
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const { records } = get();
+      const record = records.find(r => r.day === day);
+      if (!record) return;
+
+      // 로컬 상태 업데이트
+      const updatedActions = actionType === 'selfCare'
+        ? record.selfCareActions.map(a => a.id === actionId ? { ...a, label: newLabel, memo: newMemo } : a)
+        : record.kindnessActions.map(a => a.id === actionId ? { ...a, label: newLabel, memo: newMemo } : a);
+
+      const updateField = actionType === 'selfCare' ? 'self_care_actions' : 'kindness_actions';
+
+      // Supabase 업데이트
+      const { error } = await supabase
+        .from('daily_records')
+        .update({ [updateField]: updatedActions })
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id)
+        .eq('day', day);
+
+      if (error) {
+        console.error('Failed to update action:', error);
+        return;
+      }
+
+      // 로컬 상태 반영
+      const updatedRecords = records.map(r =>
+        r.day === day
+          ? {
+              ...r,
+              ...(actionType === 'selfCare'
+                ? { selfCareActions: updatedActions }
+                : { kindnessActions: updatedActions })
+            }
+          : r
+      );
+      set({ records: updatedRecords });
+    } catch (error) {
+      console.error('Update action error:', error);
     }
-
-    const updatedRecords = [...records];
-    set({ records: updatedRecords });
   },
 
-  // 행동 삭제 (동기 - 로컬 상태만 업데이트)
-  removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => {
-    const { records } = get();
-    const record = records.find(r => r.day === day);
-    if (!record) return;
+  // 행동 삭제 (Supabase 동기화)
+  removeAction: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    if (actionType === 'selfCare') {
-      record.selfCareActions = record.selfCareActions.filter(a => a.id !== actionId);
-    } else {
-      record.kindnessActions = record.kindnessActions.filter(a => a.id !== actionId);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const { records } = get();
+      const record = records.find(r => r.day === day);
+      if (!record) return;
+
+      // 삭제된 액션 필터링
+      const updatedActions = actionType === 'selfCare'
+        ? record.selfCareActions.filter(a => a.id !== actionId)
+        : record.kindnessActions.filter(a => a.id !== actionId);
+
+      const updateField = actionType === 'selfCare' ? 'self_care_actions' : 'kindness_actions';
+
+      // Supabase 업데이트
+      const { error } = await supabase
+        .from('daily_records')
+        .update({ [updateField]: updatedActions })
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id)
+        .eq('day', day);
+
+      if (error) {
+        console.error('Failed to remove action:', error);
+        return;
+      }
+
+      // 로컬 상태 반영
+      const updatedRecords = records.map(r =>
+        r.day === day
+          ? {
+              ...r,
+              ...(actionType === 'selfCare'
+                ? { selfCareActions: updatedActions }
+                : { kindnessActions: updatedActions })
+            }
+          : r
+      );
+      set({ records: updatedRecords });
+    } catch (error) {
+      console.error('Remove action error:', error);
     }
-
-    const updatedRecords = [...records];
-    set({ records: updatedRecords });
   },
 
   // 기록 완료 (스탬프 획득)

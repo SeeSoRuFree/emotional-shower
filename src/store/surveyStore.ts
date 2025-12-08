@@ -86,8 +86,8 @@ export const useSurveyStore = create<SurveyStore>((set, get) => ({
       let postSurvey: SurveyData | null = null;
 
       if (data) {
-        const preData = data.find(s => s.survey_type === 'pre_survey');
-        const postData = data.find(s => s.survey_type === 'post_survey');
+        const preData = data.find(s => s.survey_type === 'pre');
+        const postData = data.find(s => s.survey_type === 'post');
 
         if (preData) {
           const scores = preData.scores as any;
@@ -172,7 +172,7 @@ export const useSurveyStore = create<SurveyStore>((set, get) => ({
         .insert({
           user_id: user.id,
           cohort_id: cohortId,
-          survey_type: 'pre_survey',
+          survey_type: 'pre',
           responses: responses,
           scores: {
             flourishing: scores.flourishing,
@@ -225,7 +225,7 @@ export const useSurveyStore = create<SurveyStore>((set, get) => ({
         .insert({
           user_id: user.id,
           cohort_id: cohortId,
-          survey_type: 'post_survey',
+          survey_type: 'post',
           responses: responses,
           scores: {
             flourishing: scores.flourishing,

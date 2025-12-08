@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Users, Award, MessageSquare } from 'lucide-react';
 import { useCohortStore } from '@/store/cohortStore';
-import { loadAllPosts } from '@/utils/communityStorage';
+import { supabase } from '@/lib/supabase';
 import {
   BarChart,
   Bar,
@@ -20,31 +20,47 @@ import {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+interface CommunityPost {
+  id: string;
+  content: string;
+  anonymous_name: string;
+  created_at: string;
+  community_comments: { id: string }[];
+}
+
 export default function Statistics() {
   const { cohorts } = useCohortStore();
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allChallenges, setAllChallenges] = useState<any[]>([]);
+  const [allPosts, setAllPosts] = useState<CommunityPost[]>([]);
 
-  // Load all data
-  const loadUsers = () => {
-    try {
-      const stored = localStorage.getItem('kindness-users');
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      return [];
-    }
-  };
+  // Load data from Supabase
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { data: usersData } = await supabase
+          .from('users')
+          .select('*');
 
-  const loadChallenges = () => {
-    try {
-      const stored = localStorage.getItem('kindness-daily-records');
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      return [];
-    }
-  };
+        const { data: challengesData } = await supabase
+          .from('challenges')
+          .select('*');
 
-  const allUsers = useMemo(() => loadUsers(), []);
-  const allChallenges = useMemo(() => loadChallenges(), []);
-  const allPosts = useMemo(() => loadAllPosts(), []);
+        const { data: postsData } = await supabase
+          .from('community_posts')
+          .select('*, community_comments(id)')
+          .order('created_at', { ascending: false });
+
+        setAllUsers(usersData || []);
+        setAllChallenges(challengesData || []);
+        setAllPosts(postsData || []);
+      } catch (error) {
+        console.error('Failed to load statistics data:', error);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -54,7 +70,7 @@ export default function Statistics() {
       const date = new Date(today);
       date.setDate(date.getDate() - (6 - i) * 5);
       const count = allUsers.filter((u: any) =>
-        new Date(u.createdAt) <= date
+        new Date(u.created_at) <= date
       ).length;
       return {
         date: date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
@@ -64,7 +80,7 @@ export default function Statistics() {
 
     // Challenge completion by cohort
     const cohortStats = cohorts.map(cohort => {
-      const cohortChallenges = allChallenges.filter((c: any) => c.cohortId === cohort.id);
+      const cohortChallenges = allChallenges.filter((c: any) => c.cohort_id === cohort.id);
       const completed = cohortChallenges.filter((c: any) => c.status === 'completed').length;
       const active = cohortChallenges.filter((c: any) => c.status === 'active').length;
       const failed = cohortChallenges.filter((c: any) => c.status === 'failed').length;
@@ -79,7 +95,7 @@ export default function Statistics() {
 
     // User distribution by cohort (pie chart)
     const cohortDistribution = cohorts.map(cohort => {
-      const count = allUsers.filter((u: any) => u.currentCohortId === cohort.id).length;
+      const count = allUsers.filter((u: any) => u.current_cohort_id === cohort.id).length;
       return {
         name: cohort.name,
         value: count
@@ -88,12 +104,13 @@ export default function Statistics() {
 
     // Community engagement
     const totalPosts = allPosts.length;
-    const totalComments = allPosts.reduce((sum, post) => sum + post.comments.length, 0);
+    const totalComments = allPosts.reduce((sum, post) => sum + (post.community_comments?.length || 0), 0);
     const avgCommentsPerPost = totalPosts > 0 ? (totalComments / totalPosts).toFixed(1) : 0;
 
     // Top contributors (most posts)
     const postsByUser = allPosts.reduce((acc: any, post) => {
-      acc[post.anonymousName] = (acc[post.anonymousName] || 0) + 1;
+      const name = post.anonymous_name || '익명';
+      acc[name] = (acc[name] || 0) + 1;
       return acc;
     }, {});
 
@@ -109,7 +126,7 @@ export default function Statistics() {
       const dateStr = date.toISOString().split('T')[0];
 
       const postsCount = allPosts.filter(post =>
-        post.timestamp.startsWith(dateStr)
+        post.created_at?.startsWith(dateStr)
       ).length;
 
       return {
