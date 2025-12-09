@@ -85,20 +85,20 @@ export default function DailyRecord() {
     }
   }, [userChallenge, cohortId, calculateCurrentDay, navigate, getTodayRecord]);
 
-  const handleAddSelfCare = async (label: string, isCustom: boolean) => {
-    await addSelfCareAction(currentDay, label, isCustom);
+  const handleAddSelfCare = async (label: string, isCustom: boolean, memo?: string, imageUrl?: string) => {
+    await addSelfCareAction(currentDay, label, isCustom, memo, imageUrl);
   };
 
-  const handleAddKindness = async (label: string, isCustom: boolean) => {
-    await addKindnessAction(currentDay, label, isCustom);
+  const handleAddKindness = async (label: string, isCustom: boolean, memo?: string, imageUrl?: string) => {
+    await addKindnessAction(currentDay, label, isCustom, memo, imageUrl);
   };
 
   const handleRemoveAction = (type: 'selfCare' | 'kindness', actionId: string) => {
     removeAction(currentDay, type, actionId);
   };
 
-  const handleUpdateAction = (type: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => {
-    updateAction(currentDay, type, actionId, newLabel, newMemo);
+  const handleUpdateAction = (type: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string, newImageUrl?: string | null) => {
+    updateAction(currentDay, type, actionId, newLabel, newMemo, newImageUrl);
   };
 
   const handleOpenMemo = (type: 'selfCare' | 'kindness', action: Action) => {
@@ -253,9 +253,10 @@ export default function DailyRecord() {
                   examples={SELF_CARE_EXAMPLES}
                   actions={selfCareActions}
                   onAddAction={handleAddSelfCare}
-                  onUpdateAction={(id, label, memo) => handleUpdateAction('selfCare', id, label, memo)}
+                  onUpdateAction={(id, label, memo, imageUrl) => handleUpdateAction('selfCare', id, label, memo, imageUrl)}
                   onRemoveAction={(id) => handleRemoveAction('selfCare', id)}
                   accentColor="#4CAF50"
+                  cohortId={cohortId}
                 />
 
                 <motion.button
@@ -294,9 +295,10 @@ export default function DailyRecord() {
                   examples={KINDNESS_EXAMPLES}
                   actions={kindnessActions}
                   onAddAction={handleAddKindness}
-                  onUpdateAction={(id, label, memo) => handleUpdateAction('kindness', id, label, memo)}
+                  onUpdateAction={(id, label, memo, imageUrl) => handleUpdateAction('kindness', id, label, memo, imageUrl)}
                   onRemoveAction={(id) => handleRemoveAction('kindness', id)}
                   accentColor="#FFA1CC"
+                  cohortId={cohortId}
                 />
 
                 <div className="flex gap-3 mt-8">

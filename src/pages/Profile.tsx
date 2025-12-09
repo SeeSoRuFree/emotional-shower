@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  TrendingUp, Calendar, Heart, Award, Target,
-  ChevronRight, LogOut, Settings as SettingsIcon,
+  Calendar, Heart, Award, Target,
+  ChevronRight, ChevronDown, LogOut, Settings as SettingsIcon,
   Sparkles, CheckCircle2, BarChart3, Trash2, Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -15,14 +15,21 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuthStore();
+  const { currentUser, logout, switchCohort } = useAuthStore();
   const cohortId = currentUser?.currentCohortId;
 
   const { getCurrentChallenge, calculateCurrentDay, canAccessReport } = useChallengeStore();
-  const { getCohortById } = useCohortStore();
+  const { getCohortById, loadCohorts, initialized: cohortsInitialized } = useCohortStore();
   const { records, loadRecords, initialized: recordsInitialized } = useDailyRecordStore();
   const { preSurvey, loadSurveys, initialized: surveysInitialized } = useSurveyStore();
   const [showSettings, setShowSettings] = useState(false);
+
+  // Load cohorts on mount
+  useEffect(() => {
+    if (!cohortsInitialized) {
+      loadCohorts();
+    }
+  }, [cohortsInitialized, loadCohorts]);
 
   // Load daily records on mount
   useEffect(() => {
@@ -44,33 +51,6 @@ export default function Profile() {
   const currentDay = userChallenge && cohortId ? calculateCurrentDay(cohortId) : 0;
   const completionRate = userChallenge ? Math.round((userChallenge.completedDays.length / 30) * 100) : 0;
   const hasReport = cohortId ? canAccessReport(cohortId) : false;
-
-  // Calculate favorite actions
-  const getFavoriteActions = () => {
-    const selfCareCount: Record<string, number> = {};
-    const kindnessCount: Record<string, number> = {};
-
-    records.forEach(record => {
-      record.selfCareActions.forEach(action => {
-        selfCareCount[action.label] = (selfCareCount[action.label] || 0) + 1;
-      });
-      record.kindnessActions.forEach(action => {
-        kindnessCount[action.label] = (kindnessCount[action.label] || 0) + 1;
-      });
-    });
-
-    const topSelfCare = Object.entries(selfCareCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-
-    const topKindness = Object.entries(kindnessCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-
-    return { topSelfCare, topKindness };
-  };
-
-  const { topSelfCare, topKindness } = getFavoriteActions();
 
   // Calculate streak
   const calculateStreak = () => {
@@ -241,9 +221,29 @@ export default function Profile() {
           <div className="bg-headspace-pastel-blue/30 rounded-2xl p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-headspace-darkGray">참여 기수</span>
-              <span className="text-sm font-bold text-headspace-blue">
-                {currentCohort?.name || '-'}
-              </span>
+              {currentUser && currentUser.cohortHistory.length > 1 ? (
+                <div className="relative flex items-center gap-1">
+                  <select
+                    value={cohortId || ''}
+                    onChange={(e) => switchCohort(e.target.value)}
+                    className="text-sm font-bold text-headspace-blue bg-transparent outline-none cursor-pointer appearance-none pr-5"
+                  >
+                    {currentUser.cohortHistory.map((h) => {
+                      const cohort = getCohortById(h.cohortId);
+                      return (
+                        <option key={h.cohortId} value={h.cohortId}>
+                          {cohort?.name || h.cohortId}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-headspace-blue absolute right-0 pointer-events-none" />
+                </div>
+              ) : (
+                <span className="text-sm font-bold text-headspace-blue">
+                  {currentCohort?.name || '-'}
+                </span>
+              )}
             </div>
           </div>
         </motion.div>
@@ -396,7 +396,10 @@ export default function Profile() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
-            className="bg-white rounded-3xl p-5 shadow-soft"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/record-history?type=selfCare')}
+            className="bg-white rounded-3xl p-5 shadow-soft cursor-pointer hover:shadow-soft-lg transition-shadow relative"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-full bg-headspace-pastel-pink flex items-center justify-center">
@@ -408,13 +411,17 @@ export default function Profile() {
               {records.reduce((sum, r) => sum + r.selfCareActions.length, 0)}
             </p>
             <p className="text-xs text-headspace-textMuted mt-1">회 실천</p>
+            <ChevronRight className="w-4 h-4 text-headspace-textMuted absolute top-5 right-5" />
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.6 }}
-            className="bg-white rounded-3xl p-5 shadow-soft"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/record-history?type=kindness')}
+            className="bg-white rounded-3xl p-5 shadow-soft cursor-pointer hover:shadow-soft-lg transition-shadow relative"
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-full bg-headspace-pastel-purple flex items-center justify-center">
@@ -426,59 +433,9 @@ export default function Profile() {
               {records.reduce((sum, r) => sum + r.kindnessActions.length, 0)}
             </p>
             <p className="text-xs text-headspace-textMuted mt-1">회 실천</p>
+            <ChevronRight className="w-4 h-4 text-headspace-textMuted absolute top-5 right-5" />
           </motion.div>
         </div>
-
-        {/* Favorite Actions */}
-        {topSelfCare.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="bg-white rounded-3xl p-6 shadow-soft"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="w-5 h-5 text-headspace-green" />
-              <h3 className="font-bold text-headspace-darkGray">자주 하는 자기돌봄</h3>
-            </div>
-            <div className="space-y-2">
-              {topSelfCare.map(([label, count], index) => (
-                <div key={label} className="flex items-center justify-between p-3 bg-headspace-pastel-green rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                    <span className="font-medium text-headspace-darkGray">{label}</span>
-                  </div>
-                  <span className="text-sm text-headspace-textMuted">{count}회</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {topKindness.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-            className="bg-white rounded-3xl p-6 shadow-soft"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="w-5 h-5 text-headspace-pink" />
-              <h3 className="font-bold text-headspace-darkGray">자주 하는 타인친절</h3>
-            </div>
-            <div className="space-y-2">
-              {topKindness.map(([label, count], index) => (
-                <div key={label} className="flex items-center justify-between p-3 bg-headspace-pastel-pink rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
-                    <span className="font-medium text-headspace-darkGray">{label}</span>
-                  </div>
-                  <span className="text-sm text-headspace-textMuted">{count}회</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
 
         {/* Report Access */}
         {hasReport && (

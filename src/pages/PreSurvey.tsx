@@ -104,17 +104,6 @@ export default function PreSurvey() {
   const answeredQuestions = Object.keys(answers).length;
   const progressPercentage = Math.round((answeredQuestions / totalQuestions) * 100);
 
-  // 테스트용: 모든 문항 자동 채우기
-  const handleAutoFill = () => {
-    const allAnswers: Record<string, number> = {};
-    SURVEY_SECTIONS.forEach(section => {
-      section.questions.forEach(q => {
-        allAnswers[q.id] = Math.floor(Math.random() * 5) + 1; // 1-5 랜덤
-      });
-    });
-    setAnswers(allAnswers);
-  };
-
   const isSectionComplete = () => {
     return currentSection.questions.every(q => answers[q.id] !== undefined);
   };
@@ -245,19 +234,6 @@ export default function PreSurvey() {
                 >
                   시작하기
                   <ArrowRight className="w-5 h-5" />
-                </motion.button>
-
-                {/* 테스트용 자동 채우기 버튼 */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    handleAutoFill();
-                    setStep('outro');
-                  }}
-                  className="w-full py-3 mt-3 bg-gray-200 text-gray-600 rounded-full font-medium text-sm"
-                >
-                  🧪 테스트: 전체 자동 입력 후 완료
                 </motion.button>
               </motion.div>
             )}

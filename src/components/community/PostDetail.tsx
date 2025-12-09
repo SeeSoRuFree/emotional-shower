@@ -4,10 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Heart, Send, Sparkles } from 'lucide-react';
 import { useCommunityStore, type Post } from '@/store/communityStore';
 import { useAuthStore } from '@/store/authStore';
-import BottomNav from '@/components/common/BottomNav';
+import ResponsiveNav from '@/components/common/ResponsiveNav';
 
-// 커뮤니티 룸 정보
+// 커뮤니티 룸 정보 (unified 포함)
 const communityRooms = {
+  'unified': {
+    title: '공동 샤워방',
+    icon: '🌻',
+    gradient: 'from-headspace-blue to-headspace-purple',
+    pastelGradient: 'from-headspace-pastel-blue to-headspace-pastel-purple',
+  },
   'celebrate': {
     title: '축하방',
     icon: '✨',
@@ -45,7 +51,7 @@ export default function PostDetail() {
   const navigate = useNavigate();
 
   const { currentUser } = useAuthStore();
-  const { posts, loadPosts, addComment: addCommentToPost, incrementPostLikes, incrementCommentLikes } = useCommunityStore();
+  const { posts, loadAllPosts, addComment: addCommentToPost, incrementPostLikes, incrementCommentLikes, initialized } = useCommunityStore();
 
   const [post, setPost] = useState<Post | null>(null);
   const [commentContent, setCommentContent] = useState('');
@@ -54,12 +60,12 @@ export default function PostDetail() {
   const currentRoom = roomId ? communityRooms[roomId as keyof typeof communityRooms] : null;
   const cohortId = currentUser?.currentCohortId;
 
-  // 게시글 로드
+  // 게시글 로드 (통합 피드 사용)
   useEffect(() => {
-    if (cohortId && roomId) {
-      loadPosts(cohortId, roomId);
+    if (cohortId && !initialized) {
+      loadAllPosts(cohortId);
     }
-  }, [cohortId, roomId, loadPosts]);
+  }, [cohortId, initialized, loadAllPosts]);
 
   // posts가 업데이트되면 현재 게시글 찾기
   useEffect(() => {
@@ -69,10 +75,22 @@ export default function PostDetail() {
     }
   }, [postId, posts]);
   
+  // 로딩 중
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white flex items-center justify-center md:pt-16">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-headspace-blue mx-auto mb-4"></div>
+          <p className="text-headspace-textMuted">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   // 게시글을 찾지 못한 경우
   if (!post || !currentRoom) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-headspace-beige to-white flex items-center justify-center md:pt-16">
         <div className="text-center">
           <p className="text-headspace-textMuted mb-4">게시글을 찾을 수 없습니다</p>
           <button
@@ -190,10 +208,21 @@ export default function PostDetail() {
             </div>
           </div>
           
-          <p className="text-headspace-darkGray text-lg leading-relaxed mb-6">
+          <p className="text-headspace-darkGray text-lg leading-relaxed mb-4">
             {post.content}
           </p>
-          
+
+          {/* Post Image */}
+          {post.imageUrl && (
+            <div className="mb-6">
+              <img
+                src={post.imageUrl}
+                alt="Post image"
+                className="w-full rounded-2xl object-cover"
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-4 border-t border-headspace-border">
             <motion.button 
               whileHover={{ scale: 1.1 }}
@@ -323,7 +352,7 @@ export default function PostDetail() {
         </div>
       </div>
 
-      <BottomNav />
+      <ResponsiveNav />
     </div>
   );
 }

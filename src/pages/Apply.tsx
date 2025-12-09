@@ -422,24 +422,6 @@ export default function Apply() {
                     인증 코드를 보내드립니다
                   </p>
 
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mt-4">
-                    <h3 className="font-semibold text-yellow-900 mb-2 text-sm flex items-center gap-2">
-                      🧪 테스트 모드
-                    </h3>
-                    <p className="text-xs text-yellow-800 mb-2">
-                      현재 테스트 중이므로 바로 가입할 수 있습니다!
-                    </p>
-                    <div className="bg-white rounded-xl p-3 mb-2">
-                      <p className="text-xs text-yellow-700 mb-1">테스트용 코드:</p>
-                      <p className="text-lg font-bold text-yellow-900 text-center tracking-wider">
-                        TEST01
-                      </p>
-                    </div>
-                    <p className="text-xs text-yellow-700">
-                      회원가입 페이지에서 위 코드를 입력하세요
-                    </p>
-                  </div>
-
                   <div className="bg-headspace-pastel-blue/30 rounded-2xl p-4 mt-4">
                     <h3 className="font-semibold text-headspace-darkGray mb-2 text-sm">
                       📌 일반 사용자 단계 (정식 운영 시)

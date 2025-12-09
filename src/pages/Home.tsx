@@ -6,6 +6,7 @@ import ResponsiveNav from '@/components/common/ResponsiveNav';
 import StampBoard from '@/components/challenge/StampBoard';
 import ProgressBar from '@/components/challenge/ProgressBar';
 import SkyBackground from '@/components/cloud/SkyBackground';
+import DayRecordModal from '@/components/daily/DayRecordModal';
 import { useChallengeStore } from '@/store/challengeStore';
 import { useCohortStore } from '@/store/cohortStore';
 import { useAuthStore } from '@/store/authStore';
@@ -59,6 +60,8 @@ export default function Home() {
 
   const [currentDay, setCurrentDay] = useState(0);
   const [todayCompleted, setTodayCompleted] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [showRecordModal, setShowRecordModal] = useState(false);
 
   // Load challenges on mount
   useEffect(() => {
@@ -357,6 +360,9 @@ export default function Home() {
             onDayClick={(day) => {
               if (day === currentDay && !todayCompleted) {
                 navigate('/daily-record');
+              } else if (userChallenge.completedDays.includes(day)) {
+                setSelectedDay(day);
+                setShowRecordModal(true);
               }
             }}
           />
@@ -413,6 +419,17 @@ export default function Home() {
       </div>
 
       <ResponsiveNav />
+
+      {/* Day Record Modal */}
+      {showRecordModal && selectedDay && (
+        <DayRecordModal
+          day={selectedDay}
+          onClose={() => {
+            setShowRecordModal(false);
+            setSelectedDay(null);
+          }}
+        />
+      )}
     </SkyBackground>
   );
 }

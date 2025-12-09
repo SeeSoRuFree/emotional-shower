@@ -18,6 +18,7 @@ export interface Post {
   cohortId: string;
   author: string;
   content: string;
+  imageUrl?: string;
   likes: number;
   comments: Comment[];
   time: string;
@@ -48,7 +49,7 @@ interface CommunityStore {
   // Actions
   loadPosts: (cohortId: string, roomId?: string) => Promise<void>;
   loadAllPosts: (cohortId: string) => Promise<void>;
-  addPost: (cohortId: string, roomId: string, content: string, recommendedQuote?: string) => Promise<Post | null>;
+  addPost: (cohortId: string, roomId: string, content: string, recommendedQuote?: string, imageUrl?: string) => Promise<Post | null>;
   addComment: (postId: string, content: string) => Promise<boolean>;
   incrementPostLikes: (postId: string) => Promise<boolean>;
   incrementCommentLikes: (commentId: string) => Promise<boolean>;
@@ -205,6 +206,7 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
           cohortId: row.cohort_id,
           author: row.anonymous_name,
           content: row.content,
+          imageUrl: row.image_url || undefined,
           likes: row.likes,
           comments,
           time: formatTimeAgo(timestamp),
@@ -265,6 +267,7 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
           cohortId: row.cohort_id,
           author: row.anonymous_name,
           content: row.content,
+          imageUrl: row.image_url || undefined,
           likes: row.likes,
           comments,
           time: formatTimeAgo(timestamp),
@@ -282,7 +285,7 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
   },
 
   // Add new post
-  addPost: async (cohortId: string, roomId: string, content: string, recommendedQuote?: string) => {
+  addPost: async (cohortId: string, roomId: string, content: string, recommendedQuote?: string, imageUrl?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
@@ -298,6 +301,7 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
           cohort_id: cohortId,
           room_id: roomId,
           content: content.trim(),
+          image_url: imageUrl || null,
           recommended_quote: recommendedQuote || null,
           anonymous_name: anonymousName,
           avatar: avatar
@@ -316,6 +320,7 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
         cohortId: newPost.cohort_id,
         author: newPost.anonymous_name,
         content: newPost.content,
+        imageUrl: newPost.image_url || undefined,
         likes: newPost.likes,
         comments: [],
         time: '방금 전',

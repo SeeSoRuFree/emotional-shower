@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronDown, Edit2, Trash2, Check, X, Sparkles } from 'lucide-react';
+import { Plus, ChevronDown, Edit2, Trash2, Check, X, Sparkles, ImagePlus, Loader2 } from 'lucide-react';
 import type { Action } from '@/store/dailyRecordStore';
+import { uploadImage, compressImage } from '@/utils/imageUpload';
 
 interface ActionListInputProps {
   title: string;
   examples: string[];
   actions: Action[];
   maxActions?: number;
-  onAddAction: (label: string, isCustom: boolean) => void;
-  onUpdateAction: (actionId: string, newLabel: string, newMemo: string) => void;
+  onAddAction: (label: string, isCustom: boolean, memo?: string, imageUrl?: string) => void;
+  onUpdateAction: (actionId: string, newLabel: string, newMemo: string, newImageUrl?: string | null) => void;
   onRemoveAction: (actionId: string) => void;
   accentColor?: string;
+  cohortId?: string;  // 이미지 업로드용
 }
 
 export default function ActionListInput({
@@ -22,13 +24,18 @@ export default function ActionListInput({
   onAddAction,
   onUpdateAction,
   onRemoveAction,
-  accentColor = '#0061EF'
+  accentColor = '#0061EF',
+  cohortId
 }: ActionListInputProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newMemo, setNewMemo] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleStartAdding = () => {
     setIsAdding(true);
@@ -40,15 +47,47 @@ export default function ActionListInput({
     setEditingId(null);
     setNewLabel('');
     setNewMemo('');
+    setNewImageUrl(null);
+    setNewImagePreview(null);
     setShowExamples(false);
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !cohortId) return;
+
+    setIsUploadingImage(true);
+    try {
+      const compressed = await compressImage(file);
+
+      // Preview
+      const reader = new FileReader();
+      reader.onloadend = () => setNewImagePreview(reader.result as string);
+      reader.readAsDataURL(compressed);
+
+      // Upload
+      const result = await uploadImage(compressed, 'daily-record-images', cohortId);
+      setNewImageUrl(result.url);
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      alert('이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setNewImageUrl(null);
+    setNewImagePreview(null);
   };
 
   const handleSave = () => {
     if (!newLabel.trim()) return;
 
     if (editingId) {
-      // Update existing action
-      onUpdateAction(editingId, newLabel.trim(), newMemo.trim());
+      // Update existing action (pass newImageUrl: undefined to keep existing, null to remove)
+      onUpdateAction(editingId, newLabel.trim(), newMemo.trim(), newImageUrl);
       setEditingId(null);
     } else {
       // Add new action
@@ -59,18 +98,8 @@ export default function ActionListInput({
 
       // Check if it's a custom action
       const isCustom = !examples.includes(newLabel.trim());
-      onAddAction(newLabel.trim(), isCustom);
-
-      // If memo exists, update it
-      if (newMemo.trim()) {
-        // Wait for action to be added, then update memo
-        setTimeout(() => {
-          const newAction = actions.find(a => a.label === newLabel.trim());
-          if (newAction) {
-            onUpdateAction(newAction.id, newLabel.trim(), newMemo.trim());
-          }
-        }, 100);
-      }
+      // Pass memo and imageUrl directly
+      onAddAction(newLabel.trim(), isCustom, newMemo.trim() || undefined, newImageUrl || undefined);
 
       setIsAdding(false);
     }
@@ -78,6 +107,8 @@ export default function ActionListInput({
     // Reset
     setNewLabel('');
     setNewMemo('');
+    setNewImageUrl(null);
+    setNewImagePreview(null);
     setShowExamples(false);
   };
 
@@ -90,6 +121,8 @@ export default function ActionListInput({
     setEditingId(action.id);
     setNewLabel(action.label);
     setNewMemo(action.memo || '');
+    setNewImageUrl(action.imageUrl || null);
+    setNewImagePreview(action.imageUrl || null);
     setShowExamples(false);
   };
 
@@ -206,6 +239,53 @@ export default function ActionListInput({
                     )}
                   </div>
 
+                  {/* Image upload */}
+                  {cohortId && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-headspace-darkGray mb-2">
+                        사진 (선택사항)
+                      </label>
+                      {newImagePreview ? (
+                        <div className="relative rounded-xl overflow-hidden bg-gray-100">
+                          <img
+                            src={newImagePreview}
+                            alt="Preview"
+                            className="w-full h-32 object-cover"
+                          />
+                          <button
+                            onClick={handleRemoveImage}
+                            className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {isUploadingImage && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingImage}
+                          className="w-full h-20 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50"
+                        >
+                          {isUploadingImage ? (
+                            <>
+                              <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                              <span className="text-sm text-gray-400">업로드 중...</span>
+                            </>
+                          ) : (
+                            <>
+                              <ImagePlus className="w-5 h-5 text-gray-400" />
+                              <span className="text-sm text-gray-400">사진 추가</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Action buttons */}
                   <div className="flex gap-3">
                     <button
@@ -219,7 +299,7 @@ export default function ActionListInput({
                       whileHover={newLabel.trim() ? { scale: 1.02 } : {}}
                       whileTap={newLabel.trim() ? { scale: 0.98 } : {}}
                       onClick={handleSave}
-                      disabled={!newLabel.trim()}
+                      disabled={!newLabel.trim() || isUploadingImage}
                       className="flex-1 py-3 rounded-full font-medium text-white shadow-soft hover:shadow-soft-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       style={{ backgroundColor: accentColor }}
                     >
@@ -266,6 +346,17 @@ export default function ActionListInput({
                         <p className="text-sm text-headspace-textMuted mt-1 ml-8 line-clamp-1">
                           {action.memo}
                         </p>
+                      )}
+
+                      {/* Preview of image */}
+                      {action.imageUrl && (
+                        <div className="mt-2 ml-8">
+                          <img
+                            src={action.imageUrl}
+                            alt="Action"
+                            className="h-16 w-24 object-cover rounded-lg"
+                          />
+                        </div>
                       )}
                     </div>
 
@@ -438,6 +529,53 @@ export default function ActionListInput({
               )}
             </div>
 
+            {/* Image upload for new action */}
+            {cohortId && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-headspace-darkGray mb-2">
+                  사진 (선택사항)
+                </label>
+                {newImagePreview ? (
+                  <div className="relative rounded-xl overflow-hidden bg-gray-100">
+                    <img
+                      src={newImagePreview}
+                      alt="Preview"
+                      className="w-full h-32 object-cover"
+                    />
+                    <button
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {isUploadingImage && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="w-full h-20 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50"
+                  >
+                    {isUploadingImage ? (
+                      <>
+                        <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                        <span className="text-sm text-gray-400">업로드 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus className="w-5 h-5 text-gray-400" />
+                        <span className="text-sm text-gray-400">사진 추가</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex gap-3">
               <button
@@ -451,7 +589,7 @@ export default function ActionListInput({
                 whileHover={newLabel.trim() ? { scale: 1.02 } : {}}
                 whileTap={newLabel.trim() ? { scale: 0.98 } : {}}
                 onClick={handleSave}
-                disabled={!newLabel.trim()}
+                disabled={!newLabel.trim() || isUploadingImage}
                 className="flex-1 py-3 rounded-full font-medium text-white shadow-soft hover:shadow-soft-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{ backgroundColor: accentColor }}
               >
@@ -469,6 +607,15 @@ export default function ActionListInput({
           최대 {maxActions}개까지 추가할 수 있습니다
         </p>
       )}
+
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        onChange={handleImageSelect}
+        className="hidden"
+      />
     </div>
   );
 }

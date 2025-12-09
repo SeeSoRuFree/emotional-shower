@@ -17,8 +17,8 @@ interface Message {
   isVoice?: boolean;
 }
 
-// 테스트용 1분, 실제는 300초(5분)
-const CHAT_DURATION = 60; 
+// 5분 (300초)
+const CHAT_DURATION = 300; 
 
 // 음악 추천 이유
 const musicReasons = {

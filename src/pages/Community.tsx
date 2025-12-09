@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, Sparkles, Edit3, Send, Users, TrendingUp, Flame, Award, ArrowRight } from 'lucide-react';
+import { Heart, MessageCircle, Sparkles, Edit3, Send, Users, TrendingUp, Flame, Award, ArrowRight, ImagePlus, X, Loader2 } from 'lucide-react';
 import ResponsiveNav from '@/components/common/ResponsiveNav';
 import { useCommunityStore, type Post, type CohortStats } from '@/store/communityStore';
 import { recommendQuote } from '@/utils/quoteRecommendation';
 import { useChallengeStore } from '@/store/challengeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useCohortStore } from '@/store/cohortStore';
+import { uploadImage, compressImage } from '@/utils/imageUpload';
 
 // 배경 애니메이션 컴포넌트
 const FloatingShape = ({ delay }: { delay: number }) => (
@@ -50,7 +51,11 @@ export default function Community() {
 
   const [isWriting, setIsWriting] = useState(false);
   const [postContent, setPostContent] = useState('');
+  const [postImageUrl, setPostImageUrl] = useState<string | null>(null);
+  const [postImagePreview, setPostImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [stats, setStats] = useState<CohortStats | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
   const currentCohort = cohortId ? getCohortById(cohortId) : null;
@@ -80,6 +85,37 @@ export default function Community() {
   const handleCancelWriting = () => {
     setIsWriting(false);
     setPostContent('');
+    setPostImageUrl(null);
+    setPostImagePreview(null);
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      // Compress and preview
+      const compressed = await compressImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPostImagePreview(reader.result as string);
+      reader.readAsDataURL(compressed);
+
+      // Upload to Supabase Storage
+      const result = await uploadImage(compressed, 'community-images', cohortId || 'general');
+      setPostImageUrl(result.url);
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPostImageUrl(null);
+    setPostImagePreview(null);
   };
 
   const handleSubmitPost = async () => {
@@ -87,10 +123,12 @@ export default function Community() {
       // 명언 추천 (기본 감정은 'celebrate'로)
       const recommendedQuote = recommendQuote(postContent, 'celebrate');
 
-      // 게시글 추가 (unified feed, roomId는 'unified'로, cohortId 포함)
-      await addPostToStore(cohortId, 'unified', postContent, recommendedQuote || undefined);
+      // 게시글 추가 (unified feed, roomId는 'unified'로, cohortId 포함, 이미지 URL 포함)
+      await addPostToStore(cohortId, 'unified', postContent, recommendedQuote || undefined, postImageUrl || undefined);
 
       setPostContent('');
+      setPostImageUrl(null);
+      setPostImagePreview(null);
       setIsWriting(false);
     }
   };
@@ -387,21 +425,61 @@ export default function Community() {
                 autoFocus
               />
 
+              {/* Image Preview */}
+              {postImagePreview && (
+                <div className="relative mt-3 rounded-2xl overflow-hidden bg-gray-100">
+                  <img
+                    src={postImagePreview}
+                    alt="Preview"
+                    className="w-full h-48 object-cover"
+                  />
+                  <button
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  {isUploadingImage && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-headspace-border">
-                <button
-                  onClick={handleCancelWriting}
-                  className="px-4 py-2 text-headspace-textMuted hover:text-headspace-darkGray transition-colors"
-                >
-                  취소
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCancelWriting}
+                    className="px-4 py-2 text-headspace-textMuted hover:text-headspace-darkGray transition-colors"
+                  >
+                    취소
+                  </button>
+
+                  {/* Image upload button */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingImage}
+                    className="p-2 rounded-full hover:bg-headspace-pastel-blue transition-colors disabled:opacity-50"
+                  >
+                    <ImagePlus className="w-5 h-5 text-headspace-blue" />
+                  </button>
+                </div>
 
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleSubmitPost}
-                  disabled={!postContent.trim()}
+                  disabled={!postContent.trim() || isUploadingImage}
                   className={`flex items-center gap-2 px-6 py-2 rounded-full font-medium shadow-soft transition-all ${
-                    postContent.trim()
+                    postContent.trim() && !isUploadingImage
                       ? 'bg-gradient-to-r from-headspace-blue to-headspace-purple text-white hover:shadow-soft-lg'
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   }`}
@@ -461,6 +539,17 @@ export default function Community() {
                     </div>
                   </div>
                 </div>
+
+                {/* Post Image */}
+                {post.imageUrl && (
+                  <div className="mt-3 mb-4">
+                    <img
+                      src={post.imageUrl}
+                      alt="Post image"
+                      className="w-full max-h-96 object-contain rounded-2xl bg-gray-100"
+                    />
+                  </div>
+                )}
 
                 <p className="text-headspace-darkGray mb-4 pl-13 leading-relaxed">
                   {post.content}

@@ -62,7 +62,7 @@ export default function StampBoard({ completedDays, currentDay, onDayClick }: St
       <div className="grid grid-cols-6 gap-2">
         {days.map((day) => {
           const status = getDayStatus(day);
-          const isClickable = status === 'current';
+          const isClickable = status === 'current' || status === 'completed';
           const isDiagnosisDay = day === 1 || day === 30;
 
           return (
@@ -80,11 +80,11 @@ export default function StampBoard({ completedDays, currentDay, onDayClick }: St
                 relative
               `}
             >
-              {/* Day number */}
+              {/* Day number - 완료된 경우 상단에, 아닌 경우 중앙에 */}
               <span
                 className={`text-xs font-semibold ${
                   status === 'completed'
-                    ? 'text-white'
+                    ? 'text-white/80 absolute top-0.5'
                     : status === 'current' && isDiagnosisDay
                     ? 'text-purple-500'
                     : status === 'current'
@@ -93,19 +93,20 @@ export default function StampBoard({ completedDays, currentDay, onDayClick }: St
                     ? 'text-purple-600'
                     : 'text-headspace-textMuted'
                 }`}
+                style={{ fontSize: status === 'completed' ? '9px' : undefined }}
               >
                 {day}
               </span>
 
-              {/* Status icon */}
+              {/* Status icon - 완료된 경우 중앙에 체크 표시 */}
               {status === 'completed' && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                  className="absolute inset-0 flex items-center justify-center"
+                  className="flex items-center justify-center mt-1"
                 >
-                  <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                  <Check className="w-5 h-5 text-white" strokeWidth={3} />
                 </motion.div>
               )}
 

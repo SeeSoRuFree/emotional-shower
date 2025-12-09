@@ -62,6 +62,10 @@ The app uses Zustand for client-side state management, synchronized with Supabas
 
 - **applicationStore.ts**: Challenge applications and admin code verification. Uses `applications` and `application_codes` tables.
 
+- **adminAuthStore.ts**: Admin authentication state. Checks `is_admin` flag in `users` table.
+
+- **onboardingStore.ts**: Tracks onboarding completion state.
+
 **Key Pattern**: All stores call `supabase.auth.getUser()` to get current user, then perform authenticated queries with RLS automatically applied.
 
 ### Authentication & Cohort System
@@ -96,7 +100,7 @@ The app uses Zustand for client-side state management, synchronized with Supabas
 
 - **Public routes**: `/intro`, `/signup`, `/login`, `/apply`
 - **Protected routes** (require `isLoggedIn`): `/home`, `/onboarding`, `/daily-record`, `/pre-survey`, `/post-survey`, `/report`, `/community`, `/profile`
-- **Admin routes**: `/admin/login`, `/admin/dashboard`, `/admin/users`, `/admin/cohorts`, `/admin/applications`, `/admin/statistics`
+- **Admin routes**: `/admin/login`, `/admin/dashboard`, `/admin/users`, `/admin/cohorts`, `/admin/applications`, `/admin/surveys`, `/admin/records`, `/admin/community`, `/admin/statistics`
 - **Error pages**: `/unauthorized`, `/waiting`, `/not-found`
 - First-time visitors start at `/intro` (splash → intro flow)
 - Protected routes redirect to `/unauthorized` if not authenticated
@@ -225,6 +229,9 @@ Migrations located in `supabase/migrations/`:
 - `003_fix_users_insert_rls.sql`: Users insert policy fix
 - `004_add_code_used_at.sql`: Application code tracking (adds `code_used_at` field)
 - `005_add_applications_rls_and_code_used_at.sql`: Applications RLS policies
+- `007_add_admin_role.sql`: Adds `is_admin` column to users table with admin-only RLS policies
+- `008_fix_surveys_schema.sql`: Survey schema fixes
+- `009_admin_community_rls.sql`: Admin access to community posts/comments
 
 Apply migrations via Supabase CLI or dashboard.
 
@@ -233,8 +240,8 @@ Apply migrations via Supabase CLI or dashboard.
 ## Admin System
 
 - **Admin authentication**: Uses Supabase Auth with `is_admin` column in `users` table
-- **Admin dashboard**: `/admin/*` routes (dashboard, users, cohorts, applications, statistics)
-- **Features**: User management, cohort management, application approval, statistics
+- **Admin dashboard**: `/admin/*` routes (dashboard, users, cohorts, applications, surveys, records, community, statistics)
+- **Features**: User management, cohort management, application approval, survey data, daily records, community moderation, statistics
 - **Code generation**: Automatic 6-character code generation for application approval
 - **RLS policies**: Admin-only access to applications table enforced by `is_admin` flag
 - **Admin setup**: After creating admin account, manually set `is_admin = true` in Supabase Dashboard

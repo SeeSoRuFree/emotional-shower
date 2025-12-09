@@ -6,6 +6,7 @@ interface Action {
   id: string;
   label: string;       // "산책하기", "친구에게 문자 보내기"
   memo?: string;       // 선택적 메모
+  imageUrl?: string;   // 행동에 첨부된 이미지 URL
   isCustom: boolean;   // 사용자가 추가한 항목인지
   timestamp: Date;
 }
@@ -16,6 +17,7 @@ export interface DailyRecord {
   day: number;         // 1-30 (챌린지 DAY)
   selfCareActions: Action[];   // 자기돌봄 (최대 10개)
   kindnessActions: Action[];   // 타인친절 (최대 10개)
+  imageUrl?: string;           // 기록에 첨부된 이미지
   receivedQuote?: string;      // 받은 문구 선물
   isCompleted: boolean;        // Q1, Q2 모두 완료했는지
   completedAt?: Date;
@@ -29,11 +31,13 @@ interface DailyRecordStore {
   // Actions
   loadRecords: () => Promise<void>;
   getTodayRecord: (day: number) => DailyRecord | undefined;
-  addSelfCareAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
-  addKindnessAction: (day: number, label: string, isCustom: boolean) => Promise<void>;
+  addSelfCareAction: (day: number, label: string, isCustom: boolean, memo?: string, imageUrl?: string) => Promise<void>;
+  addKindnessAction: (day: number, label: string, isCustom: boolean, memo?: string, imageUrl?: string) => Promise<void>;
   updateActionMemo: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, memo: string) => Promise<void>;
-  updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => Promise<void>;
+  updateAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string, newImageUrl?: string | null) => Promise<void>;
+  updateActionImage: (day: number, actionType: 'selfCare' | 'kindness', actionId: string, imageUrl: string | null) => Promise<void>;
   removeAction: (day: number, actionType: 'selfCare' | 'kindness', actionId: string) => Promise<void>;
+  updateRecordImage: (day: number, imageUrl: string | null) => Promise<void>;
   completeRecord: (day: number, quote: string) => Promise<void>;
   getRecordByDay: (day: number) => DailyRecord | undefined;
   getTopActions: (type: 'selfCare' | 'kindness', limit?: number) => { label: string; count: number }[];
@@ -101,6 +105,7 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
           day: row.day,
           selfCareActions,
           kindnessActions,
+          imageUrl: row.image_url || undefined,
           receivedQuote: row.quote || undefined,
           isCompleted: row.is_completed,
           completedAt: row.updated_at ? new Date(row.updated_at) : undefined
@@ -120,7 +125,7 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
   },
 
   // 자기돌봄 행동 추가
-  addSelfCareAction: async (day: number, label: string, isCustom: boolean) => {
+  addSelfCareAction: async (day: number, label: string, isCustom: boolean, memo?: string, imageUrl?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -148,6 +153,8 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       const newAction: Action = {
         id: `self-${Date.now()}`,
         label,
+        memo,
+        imageUrl,
         isCustom,
         timestamp: new Date()
       };
@@ -211,7 +218,7 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
   },
 
   // 타인친절 행동 추가
-  addKindnessAction: async (day: number, label: string, isCustom: boolean) => {
+  addKindnessAction: async (day: number, label: string, isCustom: boolean, memo?: string, imageUrl?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -238,6 +245,8 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       const newAction: Action = {
         id: `kind-${Date.now()}`,
         label,
+        memo,
+        imageUrl,
         isCustom,
         timestamp: new Date()
       };
@@ -353,8 +362,8 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
     }
   },
 
-  // 행동 전체 업데이트 (제목 + 메모) (Supabase 동기화)
-  updateAction: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string) => {
+  // 행동 전체 업데이트 (제목 + 메모 + 이미지) (Supabase 동기화)
+  updateAction: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string, newLabel: string, newMemo: string, newImageUrl?: string | null) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -371,10 +380,20 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       const record = records.find(r => r.day === day);
       if (!record) return;
 
-      // 로컬 상태 업데이트
+      // 로컬 상태 업데이트 (imageUrl이 undefined면 기존 값 유지, null이면 삭제)
       const updatedActions = actionType === 'selfCare'
-        ? record.selfCareActions.map(a => a.id === actionId ? { ...a, label: newLabel, memo: newMemo } : a)
-        : record.kindnessActions.map(a => a.id === actionId ? { ...a, label: newLabel, memo: newMemo } : a);
+        ? record.selfCareActions.map(a => a.id === actionId ? {
+            ...a,
+            label: newLabel,
+            memo: newMemo,
+            ...(newImageUrl !== undefined ? { imageUrl: newImageUrl || undefined } : {})
+          } : a)
+        : record.kindnessActions.map(a => a.id === actionId ? {
+            ...a,
+            label: newLabel,
+            memo: newMemo,
+            ...(newImageUrl !== undefined ? { imageUrl: newImageUrl || undefined } : {})
+          } : a);
 
       const updateField = actionType === 'selfCare' ? 'self_care_actions' : 'kindness_actions';
 
@@ -405,6 +424,61 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       set({ records: updatedRecords });
     } catch (error) {
       console.error('Update action error:', error);
+    }
+  },
+
+  // 행동 이미지 업데이트 (Supabase 동기화)
+  updateActionImage: async (day: number, actionType: 'selfCare' | 'kindness', actionId: string, imageUrl: string | null) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const { records } = get();
+      const record = records.find(r => r.day === day);
+      if (!record) return;
+
+      // 로컬 상태 업데이트
+      const updatedActions = actionType === 'selfCare'
+        ? record.selfCareActions.map(a => a.id === actionId ? { ...a, imageUrl: imageUrl || undefined } : a)
+        : record.kindnessActions.map(a => a.id === actionId ? { ...a, imageUrl: imageUrl || undefined } : a);
+
+      const updateField = actionType === 'selfCare' ? 'self_care_actions' : 'kindness_actions';
+
+      // Supabase 업데이트
+      const { error } = await supabase
+        .from('daily_records')
+        .update({ [updateField]: updatedActions })
+        .eq('user_id', user.id)
+        .eq('cohort_id', userData.current_cohort_id)
+        .eq('day', day);
+
+      if (error) {
+        console.error('Failed to update action image:', error);
+        return;
+      }
+
+      // 로컬 상태 반영
+      const updatedRecords = records.map(r =>
+        r.day === day
+          ? {
+              ...r,
+              ...(actionType === 'selfCare'
+                ? { selfCareActions: updatedActions }
+                : { kindnessActions: updatedActions })
+            }
+          : r
+      );
+      set({ records: updatedRecords });
+    } catch (error) {
+      console.error('Update action image error:', error);
     }
   },
 
@@ -460,6 +534,80 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       set({ records: updatedRecords });
     } catch (error) {
       console.error('Remove action error:', error);
+    }
+  },
+
+  // 이미지 업데이트
+  updateRecordImage: async (day: number, imageUrl: string | null) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('current_cohort_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.current_cohort_id) return;
+
+      const cohortId = userData.current_cohort_id;
+      const { records } = get();
+      const today = new Date().toISOString().split('T')[0];
+
+      let record = records.find(r => r.day === day);
+
+      if (!record) {
+        // 새 기록 생성
+        const { error } = await supabase
+          .from('daily_records')
+          .insert({
+            user_id: user.id,
+            cohort_id: cohortId,
+            day,
+            self_care_actions: [],
+            kindness_actions: [],
+            image_url: imageUrl,
+            is_completed: false
+          });
+
+        if (error) {
+          console.error('Failed to create daily record with image:', error);
+          return;
+        }
+
+        record = {
+          date: today,
+          day,
+          selfCareActions: [],
+          kindnessActions: [],
+          imageUrl: imageUrl || undefined,
+          isCompleted: false
+        };
+
+        set({ records: [...records, record] });
+      } else {
+        // 기존 기록 업데이트
+        const { error } = await supabase
+          .from('daily_records')
+          .update({ image_url: imageUrl })
+          .eq('user_id', user.id)
+          .eq('cohort_id', cohortId)
+          .eq('day', day);
+
+        if (error) {
+          console.error('Failed to update record image:', error);
+          return;
+        }
+
+        const updatedRecords = records.map(r =>
+          r.day === day ? { ...r, imageUrl: imageUrl || undefined } : r
+        );
+
+        set({ records: updatedRecords });
+      }
+    } catch (error) {
+      console.error('Update record image error:', error);
     }
   },
 

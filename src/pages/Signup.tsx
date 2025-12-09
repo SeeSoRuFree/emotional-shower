@@ -312,17 +312,6 @@ export default function Signup() {
                   {errors.code}
                 </p>
               )}
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
-                <p className="text-xs text-yellow-800 font-semibold mb-1">
-                  🧪 테스트용 고정 코드
-                </p>
-                <p className="text-lg font-bold text-yellow-900 text-center tracking-wider">
-                  TEST01
-                </p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  위 코드를 입력하면 바로 가입할 수 있습니다
-                </p>
-              </div>
             </div>
           </div>
 

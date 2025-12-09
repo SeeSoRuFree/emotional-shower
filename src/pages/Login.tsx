@@ -107,23 +107,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Test Account Notice */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-3xl p-4 shadow-soft mb-4">
-            <p className="text-xs text-yellow-800 font-semibold mb-2">
-              🧪 테스트 계정 (바로 로그인 가능)
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <p className="text-yellow-700 mb-1">이메일:</p>
-                <p className="font-mono font-bold text-yellow-900">test@test.com</p>
-              </div>
-              <div>
-                <p className="text-yellow-700 mb-1">비밀번호:</p>
-                <p className="font-mono font-bold text-yellow-900">test123</p>
-              </div>
-            </div>
-          </div>
-
           {/* Form */}
           <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-soft space-y-4">
             {/* Email */}

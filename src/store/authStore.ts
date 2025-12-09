@@ -47,6 +47,7 @@ interface AuthStore {
   joinCohort: (cohortId: string) => Promise<{ success: boolean; error?: string }>;
   completeCohort: (cohortId: string, status: 'completed' | 'failed') => Promise<void>;
   hasActiveCohort: () => boolean;
+  switchCohort: (newCohortId: string) => Promise<void>;
 
   // Onboarding
   updateOnboardingPreferences: (preferences: OnboardingPreferences) => Promise<void>;
@@ -436,6 +437,33 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!currentUser) return false;
 
     return currentUser.cohortHistory.some(ch => ch.status === 'active');
+  },
+
+  // 기수 전환 (프로필에서 드롭다운으로 선택 시)
+  switchCohort: async (newCohortId: string) => {
+    const { currentUser } = get();
+    if (!currentUser) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ current_cohort_id: newCohortId })
+        .eq('id', currentUser.id);
+
+      if (error) {
+        console.error('Switch cohort error:', error);
+        return;
+      }
+
+      set({
+        currentUser: {
+          ...currentUser,
+          currentCohortId: newCohortId
+        }
+      });
+    } catch (error) {
+      console.error('Switch cohort error:', error);
+    }
   },
 
   // 온보딩 설정 업데이트

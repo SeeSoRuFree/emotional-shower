@@ -15,6 +15,7 @@ import DailyRecord from '@/pages/DailyRecord';
 import PreSurvey from '@/pages/PreSurvey';
 import PostSurvey from '@/pages/PostSurvey';
 import Report from '@/pages/Report';
+import RecordHistory from '@/pages/RecordHistory';
 
 // Application pages
 import Signup from '@/pages/Signup';
@@ -193,6 +194,7 @@ function App() {
           <Route path="/community/:roomId" element={isLoggedIn ? <Community /> : <Navigate to="/unauthorized" />} />
           <Route path="/community/:roomId/:postId" element={isLoggedIn ? <PostDetail /> : <Navigate to="/unauthorized" />} />
           <Route path="/profile" element={isLoggedIn ? <Profile /> : <Navigate to="/unauthorized" />} />
+          <Route path="/record-history" element={isLoggedIn ? <RecordHistory /> : <Navigate to="/unauthorized" />} />
 
           {/* 404 - Catch all */}
           <Route path="*" element={<NotFound />} />
