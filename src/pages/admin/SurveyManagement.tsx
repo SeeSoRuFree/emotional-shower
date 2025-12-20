@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Download, Eye, X, ClipboardList } from 'lucide-react';
 import { useCohortStore } from '@/store/cohortStore';
 import { supabase } from '@/lib/supabase';
+import { SURVEY_QUESTIONS } from '@/store/surveyStore';
 
 interface Survey {
   id: string;
@@ -21,22 +22,24 @@ interface Survey {
   };
 }
 
-// 설문 질문 라벨 (실제 설문 질문과 매칭)
-const PRE_SURVEY_QUESTIONS: Record<string, string> = {
-  stressLevel: '현재 스트레스 수준',
-  selfCareFrequency: '자기돌봄 실천 빈도',
-  kindnessFrequency: '타인친절 실천 빈도',
-  emotionalAwareness: '감정 인식 정도',
-  motivation: '챌린지 참여 동기',
-};
-
-const POST_SURVEY_QUESTIONS: Record<string, string> = {
-  overallSatisfaction: '전반적인 만족도',
-  stressChange: '스트레스 변화',
-  selfCareChange: '자기돌봄 변화',
-  kindnessChange: '타인친절 변화',
-  mostHelpful: '가장 도움이 된 것',
-  improvements: '개선점 제안',
+// surveyStore의 SURVEY_QUESTIONS 기반으로 라벨 맵 생성
+const QUESTION_LABEL_MAP: Record<string, string> = {
+  // Flourishing (14개)
+  ...Object.fromEntries(
+    SURVEY_QUESTIONS.flourishing.map(q => [q.id, q.text])
+  ),
+  // Satisfaction (5개)
+  ...Object.fromEntries(
+    SURVEY_QUESTIONS.satisfaction.map(q => [q.id, q.text])
+  ),
+  // Compassion (12개)
+  ...Object.fromEntries(
+    SURVEY_QUESTIONS.compassion.map(q => [q.id, q.text])
+  ),
+  // Kindness (3개)
+  ...Object.fromEntries(
+    SURVEY_QUESTIONS.kindness.map(q => [q.id, q.text])
+  )
 };
 
 export default function SurveyManagement() {
@@ -202,9 +205,23 @@ export default function SurveyManagement() {
     link.click();
   };
 
-  const getQuestionLabel = (key: string, type: 'pre' | 'post') => {
-    const questions = type === 'pre' ? PRE_SURVEY_QUESTIONS : POST_SURVEY_QUESTIONS;
-    return questions[key] || key;
+  const getQuestionLabel = (questionId: string): string => {
+    const label = QUESTION_LABEL_MAP[questionId];
+    if (label) return label;
+
+    // 폴백: questionId를 사람이 읽을 수 있는 형태로
+    const parts = questionId.split('-');
+    if (parts.length === 2) {
+      const [category, number] = parts;
+      const names: Record<string, string> = {
+        flourishing: '번영감',
+        satisfaction: '삶의 만족',
+        compassion: '자기 자비',
+        kindness: '타인 친절'
+      };
+      return `${names[category] || category} #${number}`;
+    }
+    return questionId;
   };
 
   return (
@@ -409,19 +426,52 @@ export default function SurveyManagement() {
             </div>
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               <div className="space-y-4">
-                {Object.entries(selectedSurvey.responses).map(([key, value]) => (
-                  <div key={key} className="border-b border-slate-100 pb-4 last:border-0">
-                    <p className="text-sm font-medium text-slate-700 mb-1">
-                      {getQuestionLabel(key, selectedSurvey.type)}
-                    </p>
-                    <p className="text-sm text-slate-900">
-                      {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value) || '-'}
-                    </p>
-                  </div>
-                ))}
-                {Object.keys(selectedSurvey.responses).length === 0 && (
-                  <p className="text-sm text-slate-500 text-center">응답 데이터가 없습니다</p>
-                )}
+                {(() => {
+                  let items: Array<{ questionId: string; value: any }> = [];
+
+                  if (Array.isArray(selectedSurvey.responses)) {
+                    items = selectedSurvey.responses;
+                  } else {
+                    items = Object.entries(selectedSurvey.responses).map(([key, value]) => ({
+                      questionId: key,
+                      value
+                    }));
+                  }
+
+                  if (items.length === 0) {
+                    return <p className="text-sm text-slate-500 text-center">응답 데이터가 없습니다</p>;
+                  }
+
+                  return items.map(({ questionId, value }) => (
+                    <div key={questionId} className="border-b border-slate-100 pb-4 last:border-0">
+                      <p className="text-sm font-medium text-slate-700 mb-1">
+                        {getQuestionLabel(questionId)}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-lg font-bold text-headspace-blue">
+                          {typeof value === 'number' ? value : '-'}
+                        </p>
+                        {typeof value === 'number' && (
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(level => (
+                              <div
+                                key={level}
+                                className={`w-3 h-3 rounded-full ${
+                                  level <= value ? 'bg-headspace-blue' : 'bg-gray-200'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {typeof value === 'object' && (
+                        <p className="text-xs text-slate-500 mt-2 font-mono">
+                          {JSON.stringify(value, null, 2)}
+                        </p>
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           </div>

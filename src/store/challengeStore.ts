@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { useCohortStore } from './cohortStore';
 
 // 사용자 챌린지 상태 (기수별)
 export interface UserChallenge {
@@ -198,6 +199,41 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
       );
 
       set({ challenges });
+
+      // 챌린지 시작 알림 발송 (Email + SMS)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Get cohort name
+        const cohort = useCohortStore.getState().cohorts.find(c => c.id === cohortId);
+        const cohortName = cohort?.name || '정서샤워 챌린지';
+
+        const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
+          'send-notification',
+          {
+            body: {
+              userId: user.id,
+              type: 'challenge_start_reminder',
+              channels: ['email', 'sms'],
+              data: {
+                cohortName
+              }
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          }
+        );
+
+        if (notificationError || !notificationData?.success) {
+          console.error('Failed to send challenge start notification:', notificationError);
+        } else {
+          console.log('✅ Challenge start notification sent');
+        }
+      } catch (notificationError) {
+        console.error('Challenge start notification error:', notificationError);
+      }
     } catch (error) {
       console.error('Start challenge error:', error);
     }
@@ -226,13 +262,18 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
       let newStatus = challenge.status;
       let completedAt = challenge.completedAt;
 
-      // 30일 모두 기록했고, 22일 이상이면 완료
-      if (day === 30 && completedDays.length >= 22) {
-        newStatus = 'completed';
-        completedAt = new Date();
-      } else if (day === 30 && completedDays.length < 22) {
-        newStatus = 'failed';
-        completedAt = new Date();
+      // DAY 30 완료 시: DAY 2-29 중 22일 이상이면 성공
+      if (day === 30) {
+        // DAY 2-29 중에서 완료한 날 개수 계산
+        const recordDaysCompleted = completedDays.filter(d => d >= 2 && d <= 29).length;
+
+        if (recordDaysCompleted >= 22) {
+          newStatus = 'completed';
+          completedAt = new Date();
+        } else {
+          newStatus = 'failed';
+          completedAt = new Date();
+        }
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -251,6 +292,8 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
         updateData.completed_at = completedAt.toISOString();
       }
 
+      console.log('💾 [completeDay] Supabase 업데이트 시작:', updateData);
+
       const { error } = await supabase
         .from('challenges')
         .update(updateData)
@@ -258,9 +301,10 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
         .eq('cohort_id', cohortId);
 
       if (error) {
-        console.error('Failed to complete day:', error);
+        console.error('❌ [completeDay] Supabase 업데이트 실패:', error);
         return;
       }
+      console.log('✅ [completeDay] Supabase 업데이트 성공');
 
       const challenges = get().challenges.map(ch =>
         ch.cohortId === cohortId
@@ -269,6 +313,94 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
       );
 
       set({ challenges });
+      console.log('🔄 [completeDay] 로컬 상태 업데이트 완료:', { completedDays, status: newStatus });
+
+      // 알림 발송
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Day 30: 완료/실패 알림
+        if (day === 30) {
+          if (newStatus === 'completed') {
+            // 챌린지 완료 알림 (Email + SMS)
+            const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
+              'send-notification',
+              {
+                body: {
+                  userId: user.id,
+                  type: 'challenge_completion',
+                  channels: ['email', 'sms'],
+                  data: {
+                    stamps: completedDays.length
+                  }
+                },
+                headers: {
+                  Authorization: `Bearer ${session.access_token}`
+                }
+              }
+            );
+
+            if (notificationError || !notificationData?.success) {
+              console.error('Failed to send completion notification:', notificationError);
+            } else {
+              console.log('✅ Challenge completion notification sent');
+            }
+          } else if (newStatus === 'failed') {
+            // 챌린지 실패 알림 (Email만)
+            const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
+              'send-notification',
+              {
+                body: {
+                  userId: user.id,
+                  type: 'challenge_failure',
+                  channels: ['email'],
+                  data: {
+                    stamps: completedDays.length
+                  }
+                },
+                headers: {
+                  Authorization: `Bearer ${session.access_token}`
+                }
+              }
+            );
+
+            if (notificationError || !notificationData?.success) {
+              console.error('Failed to send failure notification:', notificationError);
+            } else {
+              console.log('✅ Challenge failure notification sent');
+            }
+          }
+        }
+
+        // 마일스톤 알림 (Day 7, 15, 22)
+        if ([7, 15, 22].includes(day)) {
+          const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
+            'send-notification',
+            {
+              body: {
+                userId: user.id,
+                type: 'milestone_reached',
+                channels: ['email'],
+                data: {
+                  day
+                }
+              },
+              headers: {
+                Authorization: `Bearer ${session.access_token}`
+              }
+            }
+          );
+
+          if (notificationError || !notificationData?.success) {
+            console.error('Failed to send milestone notification:', notificationError);
+          } else {
+            console.log(`✅ Milestone notification sent for day ${day}`);
+          }
+        }
+      } catch (notificationError) {
+        console.error('Notification error:', notificationError);
+      }
     } catch (error) {
       console.error('Complete day error:', error);
     }
@@ -277,9 +409,15 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
   // 현재 DAY 계산 (스탬프 기반)
   calculateCurrentDay: (cohortId) => {
     const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
-    if (!challenge || challenge.status !== 'active') return 0;
+    if (!challenge) return 0;
 
-    // 완료한 스탬프 개수 + 1 = 다음 기록할 DAY
+    // approved 상태: DAY 1 (사전 설문 시작 전)
+    if (challenge.status === 'approved') return 1;
+
+    // active 상태가 아니면 0 (waiting, completed, failed)
+    if (challenge.status !== 'active') return 0;
+
+    // active 상태: 완료한 스탬프 개수 + 1 = 다음 기록할 DAY
     // 예: 스탬프 0개 → DAY 1, 스탬프 1개 → DAY 2, ..., 스탬프 29개 → DAY 30
     const calculatedDay = Math.min(challenge.completedDays.length + 1, 30);
     console.log('📅 [calculateCurrentDay]', {
@@ -339,13 +477,13 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
     }
   },
 
-  // 리포트 접근 가능 여부 (22일 이상 + 30일 완료)
+  // 리포트 접근 가능 여부 (DAY 2-29 중 22일 이상 + 완료 상태)
   canAccessReport: (cohortId) => {
     const challenge = get().challenges.find(ch => ch.cohortId === cohortId);
     if (!challenge) return false;
 
-    return challenge.status === 'completed' &&
-           challenge.completedDays.length >= 22;
+    const recordDaysCompleted = challenge.completedDays.filter(d => d >= 2 && d <= 29).length;
+    return challenge.status === 'completed' && recordDaysCompleted >= 22;
   },
 
   // 특정 기수 챌린지 조회

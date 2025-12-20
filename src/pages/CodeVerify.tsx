@@ -52,7 +52,7 @@ export default function CodeVerify() {
       // 온보딩 완료 처리 (Supabase에 저장)
       await completeOnboarding();
 
-      // Home으로 이동 (사전 설문 버튼 보임)
+      // Home으로 이동 (DAY 1 설문 버튼 보임)
       setIsLoading(false);
       navigate('/home');
     }, 500);

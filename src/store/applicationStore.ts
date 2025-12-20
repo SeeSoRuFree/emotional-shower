@@ -7,6 +7,7 @@ export interface Application {
   id: string;           // 고유 ID (UUID from Supabase)
   name: string;
   email: string;
+  phone: string;        // 휴대폰 번호 (SMS 알림용)
   motivation: string;
   cohortId: string | null;     // 승인 시 어드민이 할당하는 기수
   status: 'pending' | 'approved' | 'rejected';
@@ -23,10 +24,10 @@ interface ApplicationStore {
 
   // Actions
   loadApplications: () => Promise<void>;
-  submitApplication: (data: { name: string; email: string; motivation: string }) => Promise<void>;
+  submitApplication: (data: { name: string; email: string; phone: string; motivation: string }) => Promise<void>;
   approveApplication: (applicationId: string, cohortId: string) => Promise<string>;  // Returns code
   rejectApplication: (applicationId: string) => Promise<void>;
-  verifyCode: (code: string) => Promise<{ valid: boolean; cohortId?: string; applicationId?: string }>;
+  verifyCode: (code: string) => Promise<{ valid: boolean; cohortId?: string; applicationId?: string; phoneNumber?: string }>;
   markCodeAsUsed: (code: string) => Promise<void>;
   getApplicationsByStatus: (status: Application['status']) => Application[];
   getApplicationsByCohort: (cohortId: string) => Application[];
@@ -78,6 +79,7 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
         id: row.id,
         name: row.name,
         email: row.email,
+        phone: row.phone_number || '',
         motivation: row.motivation,
         cohortId: row.cohort_id,
         status: row.status,
@@ -102,6 +104,7 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
         .insert({
           name: data.name,
           email: data.email,
+          phone_number: data.phone,
           motivation: data.motivation,
           status: 'pending'
         });
@@ -157,23 +160,33 @@ export const useApplicationStore = create<ApplicationStore>((set, get) => ({
 
       set({ applications: updatedApplications });
 
-      // 이메일 발송 시뮬레이션
-      console.log(`
-📧 이메일 발송 시뮬레이션
-━━━━━━━━━━━━━━━━━━━━
-To: ${data.application.email}
-Subject: [정서샤워] 챌린지 승인 안내
+      // 승인 이메일 발송 (NHN Cloud via Edge Function)
+      try {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke(
+          'send-approval-email',
+          {
+            body: {
+              applicationId,
+              code: data.code,
+              cohortId
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          }
+        );
 
-안녕하세요 ${data.application.name}님,
-
-신청하신 챌린지가 승인되었습니다!
-아래 코드로 회원가입을 진행해주세요.
-
-인증 코드: ${data.code}
-할당 기수: ${cohortId}
-
-감사합니다.
-      `);
+        if (emailError || !emailData?.success) {
+          console.error('Failed to send approval email:', emailError || emailData?.error);
+          // 이메일 실패해도 승인은 완료 (로그만 기록)
+          // TODO: 관리자에게 알림 또는 수동 재발송 UI 제공
+        } else {
+          console.log('✅ Approval email sent successfully:', emailData.requestId);
+        }
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        // 이메일 발송 실패해도 계속 진행 (승인은 이미 완료됨)
+      }
 
       return data.code;
     } catch (error) {
@@ -185,6 +198,17 @@ Subject: [정서샤워] 챌린지 승인 안내
   // 신청 거절
   rejectApplication: async (applicationId) => {
     try {
+      // 세션 가져오기
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('로그인이 필요합니다');
+      }
+
+      // 신청자 정보 조회 (알림 발송용)
+      const application = get().applications.find(app => app.id === applicationId);
+
+      // DB 업데이트
       const { error } = await supabase
         .from('applications')
         .update({
@@ -198,6 +222,7 @@ Subject: [정서샤워] 챌린지 승인 안내
         return;
       }
 
+      // 로컬 상태 업데이트
       const applications = get().applications.map(app =>
         app.id === applicationId
           ? { ...app, status: 'rejected' as const, processedAt: new Date() }
@@ -205,6 +230,38 @@ Subject: [정서샤워] 챌린지 승인 안내
       );
 
       set({ applications });
+
+      // 거절 알림 발송 (Email + SMS)
+      if (application) {
+        try {
+          const { data: notificationData, error: notificationError } = await supabase.functions.invoke(
+            'send-notification',
+            {
+              body: {
+                // No userId - application doesn't have user account yet
+                type: 'application_rejection',
+                channels: ['email', 'sms'],
+                data: {
+                  name: application.name,
+                  email: application.email,
+                  phone_number: application.phone
+                }
+              },
+              headers: {
+                Authorization: `Bearer ${session.access_token}`
+              }
+            }
+          );
+
+          if (notificationError || !notificationData?.success) {
+            console.error('Failed to send rejection notification:', notificationError || notificationData?.error);
+          } else {
+            console.log('✅ Rejection notification sent successfully');
+          }
+        } catch (notificationError) {
+          console.error('Notification sending error:', notificationError);
+        }
+      }
     } catch (error) {
       console.error('Reject application error:', error);
     }
@@ -233,7 +290,8 @@ Subject: [정서샤워] 챌린지 승인 안내
       return {
         valid: true,
         cohortId: data.cohortId,
-        applicationId: data.applicationId
+        applicationId: data.applicationId,
+        phoneNumber: data.phoneNumber
       };
     } catch (error) {
       console.error('Verify code error:', error);

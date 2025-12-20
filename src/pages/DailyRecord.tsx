@@ -78,12 +78,25 @@ export default function DailyRecord() {
     const day = calculateCurrentDay(cohortId);
     setCurrentDay(day);
 
-    // Check if already completed today
-    const record = getTodayRecord(day);
-    if (record?.isCompleted) {
+    // DAY 2-29가 아니면 홈으로 리다이렉트
+    if (day < 2 || day > 29) {
       navigate('/home');
+      return;
     }
-  }, [userChallenge, cohortId, calculateCurrentDay, navigate, getTodayRecord]);
+
+    // 매일 1개 제한 해제: isCompleted 체크 제거
+  }, [userChallenge, cohortId, calculateCurrentDay, navigate]);
+
+  // recordType 변경 시 step 동기화
+  useEffect(() => {
+    // 초기 step에 있을 때만 리셋 (사용자가 이미 진행 중이면 방해하지 않음)
+    if (step === 'selfCare' || step === 'kindness') {
+      const initialStep = getInitialStep();
+      if (step !== initialStep) {
+        setStep(initialStep);
+      }
+    }
+  }, [recordType]);
 
   const handleAddSelfCare = async (label: string, isCustom: boolean, memo?: string, imageUrl?: string) => {
     await addSelfCareAction(currentDay, label, isCustom, memo, imageUrl);

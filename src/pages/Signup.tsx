@@ -14,7 +14,8 @@ export default function Signup() {
     email: '',
     password: '',
     passwordConfirm: '',
-    code: ''
+    code: '',
+    phone: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -25,8 +26,25 @@ export default function Signup() {
   const { verifyCode, markCodeAsUsed } = useApplicationStore();
   const { signup, completeOnboarding } = useAuthStore();
 
+  const formatPhoneNumber = (value: string) => {
+    // 숫자만 추출
+    const numbers = value.replace(/[^\d]/g, '');
+    // 최대 11자리까지만 허용
+    const truncated = numbers.slice(0, 11);
+    // 포맷팅
+    if (truncated.length <= 3) {
+      return truncated;
+    } else if (truncated.length <= 7) {
+      return `${truncated.slice(0, 3)}-${truncated.slice(3)}`;
+    } else {
+      return `${truncated.slice(0, 3)}-${truncated.slice(3, 7)}-${truncated.slice(7)}`;
+    }
+  };
+
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // 휴대폰 번호는 자동 포맷팅
+    const formattedValue = field === 'phone' ? formatPhoneNumber(value) : value;
+    setFormData(prev => ({ ...prev, [field]: formattedValue }));
     // Clear error for this field
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -64,6 +82,12 @@ export default function Signup() {
       newErrors.code = '6자리 코드를 입력해주세요';
     }
 
+    if (!formData.phone.trim()) {
+      newErrors.phone = '휴대폰 번호를 입력해주세요';
+    } else if (!/^010-\d{4}-\d{4}$/.test(formData.phone)) {
+      newErrors.phone = '올바른 전화번호 형식이 아닙니다 (010-1234-5678)';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -92,13 +116,22 @@ export default function Signup() {
         return;
       }
 
+      // 코드 검증 성공 시 전화번호 자동 입력 (수정 가능)
+      if (codeResult.phoneNumber && !formData.phone) {
+        setFormData(prev => ({
+          ...prev,
+          phone: formatPhoneNumber(codeResult.phoneNumber || '')
+        }));
+      }
+
       // 2. 회원가입 (Supabase Auth)
       setLoadingStep('계정 생성 중...');
       const signupResult = await signup({
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        cohortId: codeResult.cohortId
+        cohortId: codeResult.cohortId,
+        phoneNumber: formData.phone
       });
 
       if (!signupResult.success) {
@@ -120,7 +153,7 @@ export default function Signup() {
       // 5. 온보딩 완료 처리 (Supabase에 저장)
       await completeOnboarding();
 
-      // 6. Home으로 이동 (사전 설문 버튼 보임)
+      // 6. Home으로 이동 (DAY 1 설문 버튼 보임)
       setLoadingStep('완료!');
       setIsLoading(false);
       setLoadingStep('');
@@ -282,6 +315,33 @@ export default function Signup() {
                   {errors.passwordConfirm}
                 </p>
               )}
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label className="block text-sm font-semibold text-headspace-darkGray mb-2">
+                휴대폰 번호 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleChange('phone', e.target.value)}
+                placeholder="010-1234-5678"
+                className={`w-full px-4 py-3 border-2 rounded-2xl focus:outline-none transition-colors ${
+                  errors.phone
+                    ? 'border-red-300 focus:border-red-500'
+                    : 'border-headspace-pastel-blue focus:border-headspace-blue'
+                }`}
+              />
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.phone}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-headspace-textMuted">
+                SMS 알림을 받기 위한 전화번호입니다 (형식: 010-1234-5678)
+              </p>
             </div>
 
             {/* Code */}

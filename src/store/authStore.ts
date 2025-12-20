@@ -40,7 +40,7 @@ interface AuthStore {
   loading: boolean;
 
   // Actions
-  signup: (data: { name: string; email: string; password: string; cohortId: string }) => Promise<{ success: boolean; error?: string }>;
+  signup: (data: { name: string; email: string; password: string; cohortId: string; phoneNumber?: string }) => Promise<{ success: boolean; error?: string }>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -103,14 +103,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         return { success: false, error: '회원가입에 실패했습니다' };
       }
 
-      // 2. users 테이블에 프로필 저장
+      // 2. users 테이블에 프로필 저장 (phone_number 포함)
       const { error: profileError } = await supabase
         .from('users')
         .insert({
           id: authData.user.id,
           name: data.name,
           email: data.email,
-          current_cohort_id: data.cohortId
+          current_cohort_id: data.cohortId,
+          phone_number: data.phoneNumber || null
         });
 
       if (profileError) {

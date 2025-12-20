@@ -175,48 +175,50 @@ export default function Community() {
         </div>
       </motion.div>
 
-      {/* 카카오 오픈채팅방 배너 */}
-      <div className="relative z-10 px-6 pt-6">
-        <motion.a
-          href="https://open.kakao.com/o/PLACEHOLDER"
-          target="_blank"
-          rel="noopener noreferrer"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="block bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-500 rounded-3xl p-5 shadow-soft-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
-        >
-          {/* 배경 패턴 */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12" />
-          </div>
-
-          <div className="relative flex items-center gap-4">
-            {/* 아이콘 */}
-            <div className="flex-shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-soft">
-              <MessageCircle className="w-6 h-6 text-yellow-600" fill="currentColor" />
+      {/* 카카오 오픈채팅방 배너 - 기수에 설정된 경우에만 표시 */}
+      {currentCohort?.kakaoChatUrl && (
+        <div className="relative z-10 px-6 pt-6">
+          <motion.a
+            href={currentCohort.kakaoChatUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="block bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-500 rounded-3xl p-5 shadow-soft-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+          >
+            {/* 배경 패턴 */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12" />
             </div>
 
-            {/* 텍스트 */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-bold text-yellow-900 mb-1">
-                💬 실시간 오픈채팅방
-              </h3>
-              <p className="text-sm text-yellow-800">
-                같은 기수 참여자들과 실시간으로 소통해보세요
-              </p>
-            </div>
+            <div className="relative flex items-center gap-4">
+              {/* 아이콘 */}
+              <div className="flex-shrink-0 w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-soft">
+                <MessageCircle className="w-6 h-6 text-yellow-600" fill="currentColor" />
+              </div>
 
-            {/* 화살표 */}
-            <div className="flex-shrink-0">
-              <ArrowRight className="w-6 h-6 text-yellow-900" strokeWidth={2.5} />
+              {/* 텍스트 */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-yellow-900 mb-1">
+                  💬 실시간 오픈채팅방
+                </h3>
+                <p className="text-sm text-yellow-800">
+                  같은 기수 참여자들과 실시간으로 소통해보세요
+                </p>
+              </div>
+
+              {/* 화살표 */}
+              <div className="flex-shrink-0">
+                <ArrowRight className="w-6 h-6 text-yellow-900" strokeWidth={2.5} />
+              </div>
             </div>
-          </div>
-        </motion.a>
-      </div>
+          </motion.a>
+        </div>
+      )}
 
       {/* 통계 카드 섹션 */}
       {stats && (
@@ -409,10 +411,10 @@ export default function Community() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-headspace-darkGray">
-                    @익명 챌린저
+                    @{currentUser?.name || '챌린저'}
                   </p>
                   <p className="text-xs text-headspace-textMuted">
-                    {currentCohort?.name} · DAY {currentDay}
+                    {currentCohort?.name}{currentDay > 0 && ` · DAY ${currentDay}`}
                   </p>
                 </div>
               </div>
@@ -528,10 +530,6 @@ export default function Community() {
                         <p className="font-semibold text-headspace-darkGray">
                           @{post.author}
                         </p>
-                        {/* DAY Badge */}
-                        <span className="text-xs font-semibold text-headspace-blue bg-headspace-pastel-blue px-2 py-0.5 rounded-full">
-                          DAY {Math.floor(Math.random() * 30) + 1}
-                        </span>
                       </div>
                       <p className="text-xs text-headspace-textMuted">
                         {post.time}

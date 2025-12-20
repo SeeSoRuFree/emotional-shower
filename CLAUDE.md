@@ -80,17 +80,54 @@ The app uses Zustand for client-side state management, synchronized with Supabas
 
 ### Challenge Flow (30-Day Kindness Challenge)
 
-1. **Registration**: User signs up and selects a cohort → account created in Supabase Auth + `users` table
-2. **Onboarding**: Complete 6-step onboarding flow at `/onboarding`
-3. **Application**: User applies via application form → `applications` table entry with status: `pending`
-4. **Admin Approval**: Admin generates code in `/admin`, user verifies at `/code-verify` → application status: `approved`
-5. **Pre-Survey**: User completes `/pre-survey` → challenge status: `active`, `startedAt` recorded in `challenges` table
-6. **Daily Records**: User records daily kindness actions at `/daily-record`
+#### Application → Signup Flow
+
+**IMPORTANT**: Application and signup are completely separate processes:
+
+1. **Application** (`/apply`):
+   - User submits application form with name, email, phone, motivation
+   - Data stored in `applications` table ONLY
+   - **NO Supabase Auth user created at this stage**
+   - Email can be reused later for signup without conflict
+   - Status: `pending`
+
+2. **Admin Approval** (`/admin/applications`):
+   - Admin reviews application
+   - Generates 6-character approval code
+   - Email sent with code to applicant
+   - Application status: `approved`
+
+3. **Signup** (`/signup`):
+   - User enters approval code
+   - **Supabase Auth user created HERE** via `supabase.auth.signUp()`
+   - User profile saved to `users` table with `phone_number`
+   - User-cohort relationship saved to `user_cohorts` table
+   - Phone number auto-filled from application (can be modified)
+   - Challenge automatically created with status: `approved`
+
+**Key Point**: Application email does NOT block later signup. Auth users are only created during signup, not application.
+
+#### Challenge Progression
+
+4. **Pre-Survey** (`/pre-survey`):
+   - User completes DAY 1 설문 (34 questions)
+   - Challenge status: `active`, `startedAt` recorded in `challenges` table
+   - DAY 1 marked as completed in `completedDays` array
+
+5. **Daily Records** (`/daily-record`):
+   - User records daily kindness actions (DAY 2-30)
    - Current day = `completedDays.length + 1`
    - Each completion adds day number to `completedDays` array and updates `daily_records` table
    - Day numbers are 1-indexed (DAY 1-30)
-7. **Post-Survey**: Available when all 30 days completed → `/post-survey`
-8. **Report**: Accessible only when completed with ≥22 stamps → `/report`
+
+6. **Post-Survey** (`/post-survey`):
+   - Available only when DAY 30 reached
+   - User completes final survey (same 34 questions)
+   - Challenge status automatically set to `completed` or `failed` based on `completedDays.length >= 22`
+
+7. **Report** (`/report`):
+   - Accessible only when completed with ≥22 stamps
+   - Shows before/after comparison and growth metrics
 
 **Critical**: The challenge uses stamp-based progression, not calendar dates. Users progress at their own pace.
 

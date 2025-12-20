@@ -41,7 +41,8 @@ export default function CohortManagement() {
     status: 'recruiting' as Cohort['status'],
     description: '',
     maxParticipants: '',
-    recordType: 'both' as 'both' | 'self_care_only' | 'kindness_only'
+    recordType: 'both' as 'both' | 'self_care_only' | 'kindness_only',
+    kakaoChatUrl: ''
   });
 
   const handleOpenModal = (cohort?: Cohort) => {
@@ -54,7 +55,8 @@ export default function CohortManagement() {
         status: cohort.status,
         description: cohort.description || '',
         maxParticipants: cohort.maxParticipants?.toString() || '',
-        recordType: cohort.recordType || 'both'
+        recordType: cohort.recordType || 'both',
+        kakaoChatUrl: cohort.kakaoChatUrl || ''
       });
     } else {
       setEditingCohort(null);
@@ -65,7 +67,8 @@ export default function CohortManagement() {
         status: 'recruiting',
         description: '',
         maxParticipants: '',
-        recordType: 'both'
+        recordType: 'both',
+        kakaoChatUrl: ''
       });
     }
     setIsModalOpen(true);
@@ -91,7 +94,8 @@ export default function CohortManagement() {
       status: formData.status,
       description: formData.description || undefined,
       maxParticipants: formData.maxParticipants ? parseInt(formData.maxParticipants) : undefined,
-      recordType: formData.recordType
+      recordType: formData.recordType,
+      kakaoChatUrl: formData.kakaoChatUrl || undefined
     };
 
     if (editingCohort) {
@@ -276,7 +280,20 @@ export default function CohortManagement() {
                     <input
                       type="date"
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      onChange={(e) => {
+                        const startDate = e.target.value;
+                        let updatedFormData = { ...formData, startDate };
+
+                        // 시작일이 있으면 종료일 자동 계산 (+30일)
+                        if (startDate) {
+                          const start = new Date(startDate);
+                          const end = new Date(start);
+                          end.setDate(end.getDate() + 30);
+                          updatedFormData.endDate = end.toISOString().split('T')[0];
+                        }
+
+                        setFormData(updatedFormData);
+                      }}
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
@@ -284,12 +301,13 @@ export default function CohortManagement() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       종료일 <span className="text-red-500">*</span>
+                      <span className="text-xs text-slate-500 font-normal ml-2">(시작일 +30일 자동 계산)</span>
                     </label>
                     <input
                       type="date"
                       value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      readOnly
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-50 cursor-not-allowed"
                       required
                     />
                   </div>
@@ -397,6 +415,23 @@ export default function CohortManagement() {
                       </div>
                     </label>
                   </div>
+                </div>
+
+                {/* Kakao Chat URL */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    카카오 오픈채팅방 URL (선택)
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.kakaoChatUrl}
+                    onChange={(e) => setFormData({ ...formData, kakaoChatUrl: e.target.value })}
+                    placeholder="https://open.kakao.com/o/..."
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    이 기수의 카카오 오픈채팅방 링크를 입력하면 커뮤니티 페이지에 자동으로 표시됩니다
+                  </p>
                 </div>
 
                 {/* Actions */}

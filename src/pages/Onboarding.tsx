@@ -21,7 +21,7 @@ export default function Onboarding() {
   const handleSubmit = async () => {
     // 온보딩 완료 표시 (Supabase에 저장)
     await completeOnboarding();
-    // 사전 설문으로 이동
+    // DAY 1 설문으로 이동
     navigate('/pre-survey');
   };
 
@@ -171,7 +171,7 @@ export default function Onboarding() {
                       다음 데이터가 수집됩니다:
                     </p>
                     <ul className="list-disc pl-5 space-y-1">
-                      <li>사전/사후 설문 응답 (웰빙, 만족도, 자기연민, 친절 척도)</li>
+                      <li>DAY 1/DAY 30 설문 응답 (웰빙, 만족도, 자기연민, 친절 척도)</li>
                       <li>일일 기록 데이터 (자기돌봄, 타인친절 행동)</li>
                       <li>커뮤니티 활동 내역 (게시글, 댓글)</li>
                     </ul>
@@ -218,7 +218,7 @@ export default function Onboarding() {
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
-                  동의하고 사전 설문 시작하기
+                  동의하고 DAY 1 설문 시작하기
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </motion.div>

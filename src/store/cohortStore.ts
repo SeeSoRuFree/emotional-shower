@@ -12,6 +12,7 @@ export interface Cohort {
   createdAt: Date;
   maxParticipants?: number; // 최대 참여자 수 (선택)
   recordType?: 'both' | 'self_care_only' | 'kindness_only'; // 기록 항목 타입 (디폴트: both)
+  kakaoChatUrl?: string; // 카카오 오픈채팅방 URL (선택)
 }
 
 interface CohortStore {
@@ -28,6 +29,7 @@ interface CohortStore {
     description?: string;
     maxParticipants?: number;
     recordType?: 'both' | 'self_care_only' | 'kindness_only';
+    kakaoChatUrl?: string;
   }) => Promise<string>; // Returns cohort ID
   updateCohort: (cohortId: string, updates: Partial<Omit<Cohort, 'id' | 'createdAt'>>) => Promise<void>;
   deleteCohort: (cohortId: string) => Promise<void>;
@@ -68,6 +70,7 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
         description: row.description || undefined,
         maxParticipants: row.max_participants || undefined,
         recordType: row.record_type,
+        kakaoChatUrl: row.kakao_chat_url || undefined,
         createdAt: new Date(row.created_at)
       }));
 
@@ -110,7 +113,8 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
           status: 'recruiting',
           description: data.description || null,
           max_participants: data.maxParticipants || null,
-          record_type: data.recordType || 'both'
+          record_type: data.recordType || 'both',
+          kakao_chat_url: data.kakaoChatUrl || null
         })
         .select()
         .single();
@@ -129,6 +133,7 @@ export const useCohortStore = create<CohortStore>((set, get) => ({
         description: newCohort.description || undefined,
         maxParticipants: newCohort.max_participants || undefined,
         recordType: newCohort.record_type,
+        kakaoChatUrl: newCohort.kakao_chat_url || undefined,
         createdAt: new Date(newCohort.created_at)
       };
 

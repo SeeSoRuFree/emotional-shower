@@ -630,10 +630,31 @@ export const useDailyRecordStore = create<DailyRecordStore>((set, get) => ({
       const record = records.find(r => r.day === day);
       if (!record) return;
 
-      // Q1, Q2 모두 최소 1개 이상 있어야 완료 가능
-      if (record.selfCareActions.length === 0 || record.kindnessActions.length === 0) {
-        alert('자기돌봄과 타인친절 행동을 각각 최소 1개 이상 기록해주세요.');
-        return;
+      // Cohort의 record_type 조회
+      const { data: cohortData } = await supabase
+        .from('cohorts')
+        .select('record_type')
+        .eq('id', cohortId)
+        .single();
+
+      const recordType = cohortData?.record_type || 'both';
+
+      // recordType에 따른 조건부 validation
+      if (recordType === 'both') {
+        if (record.selfCareActions.length === 0 || record.kindnessActions.length === 0) {
+          alert('자기돌봄과 타인친절 행동을 각각 최소 1개 이상 기록해주세요.');
+          return;
+        }
+      } else if (recordType === 'self_care_only') {
+        if (record.selfCareActions.length === 0) {
+          alert('자기돌봄 행동을 최소 1개 이상 기록해주세요.');
+          return;
+        }
+      } else if (recordType === 'kindness_only') {
+        if (record.kindnessActions.length === 0) {
+          alert('타인친절 행동을 최소 1개 이상 기록해주세요.');
+          return;
+        }
       }
 
       const { error } = await supabase

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
@@ -92,12 +92,33 @@ export default function PreSurvey() {
   const { currentUser } = useAuthStore();
   const cohortId = currentUser?.currentCohortId;
 
-  const { startChallenge, completeDay } = useChallengeStore();
+  const { startChallenge, completeDay, getCurrentChallenge, canStartPreSurvey } = useChallengeStore();
   const { submitPreSurvey } = useSurveyStore();
 
   const [step, setStep] = useState<Step>('intro');
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+
+  // 이미 DAY 1 완료한 사용자 리디렉션 방지
+  useEffect(() => {
+    if (!cohortId) return;
+
+    const challenge = getCurrentChallenge(cohortId);
+
+    // DAY 1이 이미 completedDays에 있으면 홈으로
+    if (challenge?.completedDays.includes(1)) {
+      console.log('⚠️ [PreSurvey] DAY 1 이미 완료됨, 홈으로 리디렉션');
+      navigate('/home');
+      return;
+    }
+
+    // approved 상태가 아니면 홈으로
+    if (challenge && !canStartPreSurvey(cohortId)) {
+      console.log('⚠️ [PreSurvey] 사전 설문 시작 불가, 홈으로 리디렉션');
+      navigate('/home');
+      return;
+    }
+  }, [cohortId, getCurrentChallenge, canStartPreSurvey, navigate]);
 
   const currentSection = SURVEY_SECTIONS[currentSectionIndex];
   const totalQuestions = SURVEY_SECTIONS.reduce((acc, s) => acc + s.questions.length, 0);
@@ -133,20 +154,32 @@ export default function PreSurvey() {
   const handleComplete = async () => {
     if (!cohortId) return;
 
-    // Convert answers to SurveyResponse format
-    const surveyResponses: SurveyResponse[] = Object.entries(answers).map(([questionId, value]) => ({
-      questionId,
-      value
-    }));
+    try {
+      // Convert answers to SurveyResponse format
+      const surveyResponses: SurveyResponse[] = Object.entries(answers).map(([questionId, value]) => ({
+        questionId,
+        value
+      }));
 
-    await submitPreSurvey(surveyResponses);
-    await startChallenge(cohortId);
+      // 1. DAY 1 설문 제출
+      await submitPreSurvey(surveyResponses);
 
-    // 사전 설문 = DAY 1 완료 처리
-    await completeDay(cohortId, 1);
+      // 2. 챌린지 상태를 'active'로 변경 (startedAt 기록)
+      await startChallenge(cohortId);
 
-    // 홈으로 이동 (DAY 2 시작)
-    navigate('/home');
+      // 3. DAY 1 설문 완료 처리
+      await completeDay(cohortId, 1);
+
+      // 4. Supabase 동기화 시간 확보
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 5. 홈으로 이동 (reload 플래그 추가)
+      navigate('/home?reload=true');
+    } catch (error) {
+      console.error('❌ [PreSurvey] handleComplete 오류:', error);
+      // 에러가 발생해도 홈으로 이동 (사용자 경험 우선)
+      navigate('/home?reload=true');
+    }
   };
 
   return (
@@ -157,7 +190,7 @@ export default function PreSurvey() {
           <div className="max-w-lg mx-auto px-6 py-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-headspace-darkGray">
-                사전 설문
+                DAY 1 설문
               </span>
               <span className="text-sm text-headspace-textMuted">
                 {answeredQuestions} / {totalQuestions}
@@ -199,11 +232,11 @@ export default function PreSurvey() {
                 </motion.div>
 
                 <h1 className="text-3xl font-bold text-headspace-darkGray mb-4">
-                  사전 설문 시작
+                  DAY 1 설문 시작
                 </h1>
 
                 <p className="text-headspace-textMuted mb-8">
-                  챌린지 시작 전 현재 상태를 측정합니다<br />
+                  챌린지를 시작하며 현재 상태를 측정합니다<br />
                   총 34개 문항, 약 10분 소요됩니다
                 </p>
 
@@ -340,12 +373,12 @@ export default function PreSurvey() {
                 </motion.div>
 
                 <h2 className="text-2xl font-bold text-headspace-darkGray mb-4">
-                  사전 설문 완료!
+                  DAY 1 설문 완료!
                 </h2>
 
                 <p className="text-headspace-textMuted mb-8">
                   모든 문항에 응답해주셔서 감사합니다<br />
-                  이제 30일간의 친절 챌린지를 시작할 준비가 되었습니다
+                  이제 30일간의 친절 챌린지가 시작됩니다
                 </p>
 
                 <div className="bg-gradient-to-br from-headspace-pastel-blue to-headspace-pastel-purple rounded-2xl p-6 mb-6">
@@ -367,7 +400,7 @@ export default function PreSurvey() {
                   onClick={handleComplete}
                   className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg flex items-center justify-center gap-2"
                 >
-                  DAY 1 완료! 홈으로 가기
+                  DAY 1 시작하기
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </motion.div>

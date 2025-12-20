@@ -54,7 +54,7 @@ export default function PostSurvey() {
   const cohortId = currentUser?.currentCohortId;
 
   const { submitPostSurvey } = useSurveyStore();
-  const { getCurrentChallenge, completeChallenge } = useChallengeStore();
+  const { getCurrentChallenge, calculateCurrentDay, completeDay } = useChallengeStore();
 
   const userChallenge = cohortId ? getCurrentChallenge(cohortId) : undefined;
 
@@ -76,10 +76,29 @@ export default function PostSurvey() {
 
   useEffect(() => {
     // Check if user should be here
-    if (!userChallenge || userChallenge.status === 'completed') {
+    if (!userChallenge || userChallenge.status === 'completed' || userChallenge.status === 'failed') {
       navigate('/home');
+      return;
     }
-  }, [userChallenge, navigate]);
+
+    if (!cohortId) {
+      navigate('/home');
+      return;
+    }
+
+    // DAY 30이 아니면 홈으로 리다이렉트
+    const day = calculateCurrentDay(cohortId);
+    if (day !== 30) {
+      navigate('/home');
+      return;
+    }
+
+    // 이미 DAY 30 완료했으면 리포트로 리다이렉트
+    if (userChallenge.completedDays.includes(30)) {
+      navigate('/report');
+      return;
+    }
+  }, [userChallenge, cohortId, calculateCurrentDay, navigate]);
 
   const handleSelectResponse = (value: number) => {
     setResponses(prev => ({
@@ -104,13 +123,13 @@ export default function PostSurvey() {
   const handleComplete = async () => {
     if (!cohortId) return;
 
-    // Save post-survey
+    // 1. DAY 30 설문 제출
     await submitPostSurvey(responses);
 
-    // Mark challenge as completed
-    await completeChallenge(cohortId);
+    // 2. DAY 30 완료 처리 (내부에서 status='completed' 또는 'failed' 자동 처리)
+    await completeDay(cohortId, 30);
 
-    // Navigate to report
+    // 3. 리포트로 이동
     navigate('/report');
   };
 
@@ -131,7 +150,7 @@ export default function PostSurvey() {
 
             <div className="text-center">
               <h1 className="font-semibold text-headspace-darkGray">
-                사후 설문
+                DAY 30 설문
               </h1>
               <p className="text-xs text-headspace-textMuted">
                 질문 {currentQuestionIndex + 1} / {totalQuestions}

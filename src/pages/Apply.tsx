@@ -13,12 +13,28 @@ export default function Apply() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     motivation: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agreed, setAgreed] = useState(false);
 
   const { submitApplication } = useApplicationStore();
+
+  const formatPhoneNumber = (value: string) => {
+    // 숫자만 추출
+    const numbers = value.replace(/[^\d]/g, '');
+    // 최대 11자리까지만 허용
+    const truncated = numbers.slice(0, 11);
+    // 포맷팅
+    if (truncated.length <= 3) {
+      return truncated;
+    } else if (truncated.length <= 7) {
+      return `${truncated.slice(0, 3)}-${truncated.slice(3)}`;
+    } else {
+      return `${truncated.slice(0, 3)}-${truncated.slice(3, 7)}-${truncated.slice(7)}`;
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -33,6 +49,12 @@ export default function Apply() {
       newErrors.email = '올바른 이메일 형식이 아닙니다';
     }
 
+    if (!formData.phone.trim()) {
+      newErrors.phone = '휴대폰 번호를 입력해주세요';
+    } else if (!/^010-\d{4}-\d{4}$/.test(formData.phone)) {
+      newErrors.phone = '올바른 전화번호 형식이 아닙니다 (010-1234-5678)';
+    }
+
     if (!formData.motivation.trim()) {
       newErrors.motivation = '참여 동기를 입력해주세요';
     } else if (formData.motivation.length < 10) {
@@ -44,7 +66,9 @@ export default function Apply() {
   };
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // 휴대폰 번호는 자동 포맷팅
+    const formattedValue = field === 'phone' ? formatPhoneNumber(value) : value;
+    setFormData(prev => ({ ...prev, [field]: formattedValue }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -61,6 +85,7 @@ export default function Apply() {
       await submitApplication({
         name: formData.name,
         email: formData.email,
+        phone: formData.phone,
         motivation: formData.motivation
       });
 
@@ -260,6 +285,30 @@ export default function Apply() {
                     </p>
                   </div>
 
+                  {/* Phone Number */}
+                  <div>
+                    <label className="block text-sm font-semibold text-headspace-darkGray mb-2">
+                      휴대폰 번호 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                      placeholder="010-1234-5678"
+                      className={`w-full px-4 py-3 border-2 rounded-2xl focus:outline-none transition-colors ${
+                        errors.phone
+                          ? 'border-red-300 focus:border-red-500'
+                          : 'border-headspace-pastel-blue focus:border-headspace-blue'
+                      }`}
+                    />
+                    {errors.phone && (
+                      <p className="mt-1 text-sm text-red-500">{errors.phone}</p>
+                    )}
+                    <p className="mt-1 text-xs text-headspace-textMuted">
+                      SMS 알림을 받기 위한 전화번호입니다 (형식: 010-1234-5678)
+                    </p>
+                  </div>
+
                   {/* Motivation */}
                   <div>
                     <label className="block text-sm font-semibold text-headspace-darkGray mb-2">
@@ -330,7 +379,7 @@ export default function Apply() {
                       다음 데이터가 수집됩니다:
                     </p>
                     <ul className="list-disc pl-5 space-y-1">
-                      <li>사전/사후 설문 응답 (웰빙, 만족도, 자기연민, 친절 척도)</li>
+                      <li>DAY 1/DAY 30 설문 응답 (웰빙, 만족도, 자기연민, 친절 척도)</li>
                       <li>일일 기록 데이터 (자기돌봄, 타인친절 행동)</li>
                       <li>커뮤니티 활동 내역 (게시글, 댓글)</li>
                     </ul>
@@ -429,8 +478,8 @@ export default function Apply() {
                     <ol className="text-xs text-headspace-textMuted text-left space-y-1">
                       <li>1. 신청서 검토 및 승인 (1-2일 소요)</li>
                       <li>2. 승인 시 이메일로 인증 코드 발송</li>
-                      <li>3. 코드 입력 후 사전 설문 진행</li>
-                      <li>4. 챌린지 시작 (DAY 1부터)</li>
+                      <li>3. 코드 입력 후 회원가입</li>
+                      <li>4. 챌린지 시작 (DAY 1 설문부터)</li>
                     </ol>
                   </div>
                 </div>
@@ -441,7 +490,7 @@ export default function Apply() {
                   onClick={() => navigate('/signup')}
                   className="w-full py-4 bg-gradient-to-r from-headspace-blue to-headspace-purple text-white rounded-full font-semibold shadow-soft-lg mb-3"
                 >
-                  테스트 코드로 바로 회원가입하기 →
+                  승인코드로 바로 회원가입하기 →
                 </motion.button>
 
                 <motion.button

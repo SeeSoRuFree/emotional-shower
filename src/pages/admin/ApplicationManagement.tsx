@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FileText, Check, X, Clock, Mail, Calendar, Copy } from 'lucide-react';
+import { FileText, Check, X, Clock, Mail, Calendar, Copy, Phone } from 'lucide-react';
 import { useApplicationStore } from '@/store/applicationStore';
 import { useCohortStore } from '@/store/cohortStore';
 import { motion } from 'framer-motion';
@@ -8,11 +8,12 @@ type TabType = 'pending' | 'approved' | 'rejected';
 
 export default function ApplicationManagement() {
   const { applications, approveApplication, rejectApplication, loadApplications, initialized } = useApplicationStore();
-  const { cohorts } = useCohortStore();
+  const { cohorts, loadCohorts, initialized: cohortsInitialized } = useCohortStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [selectedCohortForApproval, setSelectedCohortForApproval] = useState<string>('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   // Load applications on mount
   useEffect(() => {
@@ -20,6 +21,13 @@ export default function ApplicationManagement() {
       loadApplications();
     }
   }, [initialized, loadApplications]);
+
+  // Load cohorts on mount
+  useEffect(() => {
+    if (!cohortsInitialized) {
+      loadCohorts();
+    }
+  }, [cohortsInitialized, loadCohorts]);
 
   // Filter applications by status
   const filteredApplications = useMemo(() => {
@@ -32,10 +40,21 @@ export default function ApplicationManagement() {
       return;
     }
 
-    const code = await approveApplication(applicationId, selectedCohortForApproval);
-    alert(`승인되었습니다!\n\n발급된 코드: ${code}\n\n이메일로 코드가 전송됩니다.`);
-    setApprovingId(null);
-    setSelectedCohortForApproval('');
+    // 중복 클릭 방지
+    if (isApproving) return;
+
+    try {
+      setIsApproving(true);
+      const code = await approveApplication(applicationId, selectedCohortForApproval);
+      alert(`승인되었습니다!\n\n발급된 코드: ${code}\n\n이메일로 코드가 전송됩니다.`);
+      setApprovingId(null);
+      setSelectedCohortForApproval('');
+    } catch (error) {
+      console.error('Approval error:', error);
+      alert('승인 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleReject = async (applicationId: string, applicantName: string) => {
@@ -179,6 +198,10 @@ export default function ApplicationManagement() {
                             {application.email}
                           </div>
                           <div className="flex items-center gap-1">
+                            <Phone className="w-4 h-4" />
+                            {application.phone || '미입력'}
+                          </div>
+                          <div className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
                             {application.appliedAt.toLocaleDateString('ko-KR')}
                           </div>
@@ -256,9 +279,14 @@ export default function ApplicationManagement() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleApprove(application.id)}
-                              className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              disabled={isApproving}
+                              className={`flex-1 px-3 py-2 text-white text-sm font-medium rounded-lg transition-colors ${
+                                isApproving
+                                  ? 'bg-gray-400 cursor-not-allowed'
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
                             >
-                              확인
+                              {isApproving ? '처리중...' : '확인'}
                             </button>
                             <button
                               onClick={() => {

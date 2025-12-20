@@ -290,7 +290,14 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const anonymousName = generateAnonymousName();
+      // 사용자 이름 조회
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      const anonymousName = userData?.name || '익명 사용자';
       const avatar = getRandomAvatar();
 
       // Insert post
@@ -372,7 +379,14 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const anonymousName = generateAnonymousName();
+      // 사용자 이름 조회
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      const anonymousName = userData?.name || '익명 사용자';
 
       const { data: newComment, error } = await supabase
         .from('community_comments')
