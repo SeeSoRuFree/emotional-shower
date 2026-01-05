@@ -1,0 +1,2259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>데이터베이스 스키마 설계서 - 정서샤워</title>
+  <style>
+    /* ========================================
+       정부 보고서 스타일 - 프린트 최적화
+    ======================================== */
+
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* 정부 공식 색상 */
+      --primary-blue: #003876;
+      --primary-blue-light: #0056b3;
+      --primary-blue-lighter: #e7f1ff;
+
+      /* 그레이스케일 */
+      --gray-dark: #333333;
+      --gray-medium: #666666;
+      --gray-light: #999999;
+      --gray-lighter: #f5f5f5;
+
+      /* 액센트 */
+      --accent-green: #28a745;
+      --accent-red: #dc3545;
+      --accent-yellow: #ffc107;
+
+      /* 테이블 */
+      --bg-table-header: #f0f3f7;
+      --border-dark: #333333;
+      --border-medium: #cccccc;
+      --border-light: #e0e0e0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+      font-size: 10pt;
+      line-height: 1.6;
+      color: var(--gray-dark);
+      background: white;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 210mm; /* A4 width */
+      margin: 0 auto;
+      background: white;
+    }
+
+    /* ========================================
+       표지 페이지
+    ======================================== */
+    .cover-page {
+      page-break-after: always;
+      min-height: 297mm; /* A4 height */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 60px 40px;
+      border: 3pt solid var(--primary-blue);
+    }
+
+    .cover-title {
+      font-size: 32pt;
+      font-weight: 700;
+      color: var(--primary-blue);
+      margin-bottom: 20px;
+      letter-spacing: -0.5pt;
+    }
+
+    .cover-subtitle {
+      font-size: 20pt;
+      font-weight: 500;
+      color: var(--gray-dark);
+      margin-bottom: 60px;
+    }
+
+    .cover-meta {
+      width: 100%;
+      max-width: 500px;
+      margin: 40px auto;
+    }
+
+    .cover-meta table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1pt solid var(--border-dark);
+    }
+
+    .cover-meta th {
+      background: var(--bg-table-header);
+      padding: 12pt;
+      border: 1pt solid var(--border-medium);
+      font-weight: 600;
+      text-align: left;
+      width: 30%;
+    }
+
+    .cover-meta td {
+      padding: 12pt;
+      border: 1pt solid var(--border-medium);
+    }
+
+    .cover-approval {
+      margin-top: 80px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .approval-row {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+    }
+
+    .approval-box {
+      text-align: center;
+    }
+
+    .approval-label {
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .approval-signature {
+      border: 1pt solid var(--border-medium);
+      width: 120px;
+      height: 80px;
+      margin: 10px auto;
+    }
+
+    /* ========================================
+       목차
+    ======================================== */
+    .toc-page {
+      page-break-after: always;
+      padding: 40px;
+    }
+
+    .page-title {
+      font-size: 20pt;
+      font-weight: 700;
+      color: var(--primary-blue);
+      border-bottom: 3pt solid var(--primary-blue);
+      padding-bottom: 10pt;
+      margin-bottom: 30pt;
+    }
+
+    .toc-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .toc-item {
+      padding: 8pt 0;
+      border-bottom: 1pt dotted var(--border-light);
+    }
+
+    .toc-item a {
+      text-decoration: none;
+      color: var(--gray-dark);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .toc-item a:hover {
+      color: var(--primary-blue);
+    }
+
+    .toc-number {
+      font-weight: 600;
+      margin-right: 10pt;
+    }
+
+    .toc-title {
+      flex: 1;
+    }
+
+    .toc-page-num {
+      color: var(--gray-medium);
+    }
+
+    .toc-level-1 {
+      font-size: 11pt;
+      font-weight: 600;
+    }
+
+    .toc-level-2 {
+      font-size: 10pt;
+      padding-left: 20pt;
+    }
+
+    /* ========================================
+       섹션 공통
+    ======================================== */
+    .section {
+      page-break-before: always;
+      padding: 40px;
+    }
+
+    .section-title {
+      font-size: 16pt;
+      font-weight: 700;
+      color: var(--primary-blue);
+      border-bottom: 2pt solid var(--primary-blue);
+      padding-bottom: 8pt;
+      margin-bottom: 20pt;
+    }
+
+    .subsection-title {
+      font-size: 13pt;
+      font-weight: 600;
+      color: var(--gray-dark);
+      margin-top: 20pt;
+      margin-bottom: 10pt;
+    }
+
+    .subsubsection-title {
+      font-size: 11pt;
+      font-weight: 600;
+      color: var(--gray-medium);
+      margin-top: 15pt;
+      margin-bottom: 8pt;
+    }
+
+    p, li {
+      margin-bottom: 8pt;
+    }
+
+    /* ========================================
+       테이블 스타일
+    ======================================== */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1pt solid var(--border-dark);
+      margin: 15pt 0;
+      font-size: 9pt;
+      page-break-inside: avoid;
+    }
+
+    table caption {
+      caption-side: top;
+      text-align: left;
+      font-weight: 600;
+      color: var(--primary-blue);
+      padding: 8pt 0;
+      font-size: 10pt;
+    }
+
+    th {
+      background: var(--bg-table-header);
+      padding: 8pt 10pt;
+      border: 1pt solid var(--border-medium);
+      font-weight: 600;
+      text-align: left;
+      color: var(--gray-dark);
+    }
+
+    td {
+      padding: 8pt 10pt;
+      border: 1pt solid var(--border-light);
+      vertical-align: top;
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--gray-lighter);
+    }
+
+    tbody tr:hover {
+      background: #fafbfc;
+    }
+
+    /* 컬럼 폭 조정 */
+    .col-no { width: 5%; }
+    .col-name { width: 20%; }
+    .col-type { width: 15%; }
+    .col-null { width: 8%; }
+    .col-key { width: 10%; }
+    .col-desc { width: 42%; }
+
+    /* ========================================
+       배지 시스템
+    ======================================== */
+    .badge {
+      display: inline-block;
+      padding: 2pt 6pt;
+      font-size: 8pt;
+      border-radius: 2pt;
+      border: 1pt solid;
+      font-weight: 600;
+      margin-left: 4pt;
+    }
+
+    .badge-pk {
+      background: #fff3cd;
+      border-color: var(--accent-yellow);
+      color: #856404;
+    }
+
+    .badge-fk {
+      background: #d1ecf1;
+      border-color: var(--primary-blue-light);
+      color: #004085;
+    }
+
+    .badge-unique {
+      background: #d4edda;
+      border-color: var(--accent-green);
+      color: #155724;
+    }
+
+    /* ========================================
+       코드 스타일
+    ======================================== */
+    code {
+      font-family: 'D2Coding', 'Consolas', 'Monaco', monospace;
+      font-size: 9pt;
+      background: var(--gray-lighter);
+      padding: 2pt 4pt;
+      border-radius: 2pt;
+      color: #e83e8c;
+    }
+
+    pre {
+      background: var(--gray-lighter);
+      padding: 10pt;
+      border-left: 3pt solid var(--primary-blue);
+      overflow-x: auto;
+      font-size: 9pt;
+    }
+
+    /* ========================================
+       통계 박스
+    ======================================== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15pt;
+      margin: 20pt 0;
+    }
+
+    .stat-box {
+      border: 1pt solid var(--border-medium);
+      padding: 15pt;
+      text-align: center;
+      background: var(--gray-lighter);
+    }
+
+    .stat-number {
+      font-size: 24pt;
+      font-weight: 700;
+      color: var(--primary-blue);
+    }
+
+    .stat-label {
+      font-size: 9pt;
+      color: var(--gray-medium);
+      margin-top: 5pt;
+    }
+
+    /* ========================================
+       ERD 다이어그램
+    ======================================== */
+    .erd-container {
+      margin: 20pt 0;
+      padding: 20pt;
+      border: 1pt solid var(--border-light);
+      background: white;
+      page-break-inside: avoid;
+    }
+
+    .erd-svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* ========================================
+       리스트 스타일
+    ======================================== */
+    ul, ol {
+      margin-left: 20pt;
+      margin-bottom: 10pt;
+    }
+
+    .policy-list, .constraint-list {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .policy-list li, .constraint-list li {
+      padding: 6pt 10pt;
+      background: var(--gray-lighter);
+      border-left: 3pt solid var(--primary-blue);
+      margin-bottom: 6pt;
+      font-size: 9pt;
+    }
+
+    /* ========================================
+       프린트 최적화
+    ======================================== */
+    @page {
+      size: A4 portrait;
+      margin: 25mm 20mm;
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .section {
+        page-break-before: always;
+      }
+
+      table, .stat-box, .erd-container {
+        page-break-inside: avoid;
+      }
+
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      /* 프린트 시 배경색 유지 */
+      th, tbody tr:nth-child(even), .stat-box, .policy-list li {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+
+    /* ========================================
+       유틸리티
+    ======================================== */
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .mt-20 { margin-top: 20pt; }
+    .mb-20 { margin-bottom: 20pt; }
+    .font-weight-bold { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ========================================
+         표지 페이지
+    ======================================== -->
+    <div class="cover-page">
+      <h1 class="cover-title">데이터베이스 스키마 설계서</h1>
+      <p class="cover-subtitle">정서샤워 모바일 앱 MVP 개발 용역</p>
+
+      <div class="cover-meta">
+        <table>
+          <tr>
+            <th>문서번호</th>
+            <td>ES-DB-2025-001</td>
+          </tr>
+          <tr>
+            <th>작성일</th>
+            <td>2025년 11월 25일</td>
+          </tr>
+          <tr>
+            <th>최종수정일</th>
+            <td>2025년 11월 30일</td>
+          </tr>
+          <tr>
+            <th>버전</th>
+            <td>v1.1 (이미지 스토리지 추가)</td>
+          </tr>
+          <tr>
+            <th>보안등급</th>
+            <td>대외비 (Confidential)</td>
+          </tr>
+          <tr>
+            <th>작성자</th>
+            <td>정서샤워 개발팀</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="cover-approval">
+        <div class="approval-row" style="justify-content: center;">
+          <div class="approval-box">
+            <div class="approval-signature"></div>
+            <p>주식회사 시소 (인)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================
+         목차
+    ======================================== -->
+    <div class="toc-page">
+      <h2 class="page-title">목차</h2>
+      <ul class="toc-list">
+        <li class="toc-item toc-level-1">
+          <a href="#section-1">
+            <span><span class="toc-number">1.</span><span class="toc-title">개요</span></span>
+            <span class="toc-page-num">3</span>
+          </a>
+        </li>
+        <li class="toc-item toc-level-2">
+          <a href="#section-1-1">
+            <span><span class="toc-number">1.1</span><span class="toc-title">프로젝트 배경</span></span>
+            <span class="toc-page-num">3</span>
+          </a>
+        </li>
+        <li class="toc-item toc-level-2">
+          <a href="#section-1-2">
+            <span><span class="toc-number">1.2</span><span class="toc-title">데이터베이스 통계</span></span>
+            <span class="toc-page-num">3</span>
+          </a>
+        </li>
+        <li class="toc-item toc-level-2">
+          <a href="#section-1-3">
+            <span><span class="toc-number">1.3</span><span class="toc-title">기술 스택</span></span>
+            <span class="toc-page-num">4</span>
+          </a>
+        </li>
+
+        <li class="toc-item toc-level-1">
+          <a href="#section-2">
+            <span><span class="toc-number">2.</span><span class="toc-title">데이터베이스 구조 개요</span></span>
+            <span class="toc-page-num">5</span>
+          </a>
+        </li>
+
+        <li class="toc-item toc-level-1">
+          <a href="#section-3">
+            <span><span class="toc-number">3.</span><span class="toc-title">테이블 상세 명세</span></span>
+            <span class="toc-page-num">7</span>
+          </a>
+        </li>
+
+        <li class="toc-item toc-level-1">
+          <a href="#section-4">
+            <span><span class="toc-number">4.</span><span class="toc-title">보안 및 데이터 무결성</span></span>
+            <span class="toc-page-num">17</span>
+          </a>
+        </li>
+
+        <li class="toc-item toc-level-1">
+          <a href="#section-5">
+            <span><span class="toc-number">5.</span><span class="toc-title">스토리지 인프라</span></span>
+            <span class="toc-page-num">19</span>
+          </a>
+        </li>
+
+        <li class="toc-item toc-level-1">
+          <a href="#section-6">
+            <span><span class="toc-number">6.</span><span class="toc-title">부록</span></span>
+            <span class="toc-page-num">20</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- ========================================
+         1. 개요
+    ======================================== -->
+    <div class="section" id="section-1">
+      <h2 class="section-title">1. 개요</h2>
+
+      <h3 class="subsection-title" id="section-1-1">1.1 프로젝트 배경</h3>
+      <p>
+        본 문서는 정서샤워(Emotional Shower) 모바일 앱 MVP 개발 프로젝트의 데이터베이스 스키마 설계서입니다.
+        정서샤워는 정서적 위생과 30일 친절 챌린지를 중심으로 한 모바일 우선 웹 애플리케이션으로,
+        사용자들의 감정 체크인, AI 대화, 커뮤니티 기능, 코호트 기반 참여 추적을 제공합니다.
+      </p>
+      <p>
+        데이터베이스는 Supabase(PostgreSQL 15.x 기반)를 사용하며, 행 단위 보안(Row Level Security)을 통해
+        사용자 데이터를 안전하게 보호합니다. 2025년 11월 25일 초기 스키마가 구축되었으며,
+        11월 30일 이미지 스토리지 기능이 추가되어 현재 v1.1 버전으로 운영 중입니다.
+      </p>
+
+      <h3 class="subsection-title" id="section-1-2">1.2 데이터베이스 통계</h3>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-number">9</div>
+          <div class="stat-label">테이블</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">91</div>
+          <div class="stat-label">컬럼</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">8</div>
+          <div class="stat-label">외래키 관계</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">30</div>
+          <div class="stat-label">RLS 정책</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">20</div>
+          <div class="stat-label">인덱스</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">2</div>
+          <div class="stat-label">스토리지 버킷</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">6</div>
+          <div class="stat-label">Enum 타입</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">2</div>
+          <div class="stat-label">RPC 함수</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">11</div>
+          <div class="stat-label">마이그레이션</div>
+        </div>
+      </div>
+
+      <h3 class="subsection-title" id="section-1-3">1.3 기술 스택</h3>
+      <table>
+        <caption>표 1-1. 데이터베이스 기술 스택</caption>
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>기술</th>
+            <th>버전/설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>데이터베이스</td>
+            <td>PostgreSQL</td>
+            <td>15.x (Supabase 관리형)</td>
+          </tr>
+          <tr>
+            <td>클라우드 플랫폼</td>
+            <td>Supabase</td>
+            <td>BaaS (Backend as a Service)</td>
+          </tr>
+          <tr>
+            <td>인증</td>
+            <td>Supabase Auth</td>
+            <td>Email/Password, JWT 토큰</td>
+          </tr>
+          <tr>
+            <td>보안</td>
+            <td>Row Level Security</td>
+            <td>PostgreSQL RLS 정책 기반</td>
+          </tr>
+          <tr>
+            <td>스토리지</td>
+            <td>Supabase Storage</td>
+            <td>이미지 업로드 (jpg, png, webp)</td>
+          </tr>
+          <tr>
+            <td>실시간 기능</td>
+            <td>Supabase Realtime</td>
+            <td>WebSocket 기반 구독</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ========================================
+         2. 데이터베이스 구조 개요
+    ======================================== -->
+    <div class="section" id="section-2">
+      <h2 class="section-title">2. 데이터베이스 구조 개요</h2>
+
+      <h3 class="subsection-title">2.1 ERD (Entity Relationship Diagram)</h3>
+      <div class="erd-container">
+        <svg class="erd-svg" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
+          <!-- Users -->
+          <rect x="350" y="30" width="200" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="450" y="60" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">users</text>
+          <text x="450" y="80" text-anchor="middle" fill="#666" font-size="11">사용자 프로필</text>
+
+          <!-- Cohorts -->
+          <rect x="650" y="150" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="740" y="180" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">cohorts</text>
+          <text x="740" y="200" text-anchor="middle" fill="#666" font-size="11">기수 정보</text>
+
+          <!-- User Cohorts -->
+          <rect x="350" y="150" width="200" height="70" rx="5" fill="none" stroke="#28a745" stroke-width="2"/>
+          <text x="450" y="180" text-anchor="middle" fill="#28a745" font-weight="bold" font-size="14">user_cohorts</text>
+          <text x="450" y="200" text-anchor="middle" fill="#666" font-size="11">사용자-기수</text>
+
+          <!-- Challenges -->
+          <rect x="70" y="150" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="160" y="180" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">challenges</text>
+          <text x="160" y="200" text-anchor="middle" fill="#666" font-size="11">챌린지</text>
+
+          <!-- Daily Records -->
+          <rect x="70" y="280" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="160" y="310" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">daily_records</text>
+          <text x="160" y="330" text-anchor="middle" fill="#666" font-size="11">일일 기록</text>
+
+          <!-- Surveys -->
+          <rect x="350" y="280" width="200" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="450" y="310" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">surveys</text>
+          <text x="450" y="330" text-anchor="middle" fill="#666" font-size="11">사전/사후 설문</text>
+
+          <!-- Community Posts -->
+          <rect x="650" y="280" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="740" y="310" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">community_posts</text>
+          <text x="740" y="330" text-anchor="middle" fill="#666" font-size="11">커뮤니티 게시글</text>
+
+          <!-- Community Comments -->
+          <rect x="650" y="410" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="740" y="440" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">community_comments</text>
+          <text x="740" y="460" text-anchor="middle" fill="#666" font-size="11">댓글</text>
+
+          <!-- Applications -->
+          <rect x="70" y="410" width="180" height="70" rx="5" fill="none" stroke="#003876" stroke-width="2"/>
+          <text x="160" y="440" text-anchor="middle" fill="#003876" font-weight="bold" font-size="14">applications</text>
+          <text x="160" y="460" text-anchor="middle" fill="#666" font-size="11">신청서</text>
+
+          <!-- Relationships -->
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+            </marker>
+          </defs>
+
+          <!-- Lines -->
+          <line x1="450" y1="100" x2="450" y2="150" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="350" y1="65" x2="250" y2="150" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="630" y1="185" x2="550" y2="185" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="350" y1="90" x2="160" y2="280" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="450" y1="100" x2="450" y2="280" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="550" y1="65" x2="740" y2="280" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="740" y1="350" x2="740" y2="410" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+          <line x1="650" y1="200" x2="250" y2="410" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)" />
+        </svg>
+      </div>
+
+      <h3 class="subsection-title">2.2 테이블 관계</h3>
+      <table>
+        <caption>표 2-1. 테이블 간 관계</caption>
+        <thead>
+          <tr>
+            <th>관계</th>
+            <th>유형</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>users → cohorts</td>
+            <td>N:1</td>
+            <td>사용자의 현재 참여 기수 (current_cohort_id)</td>
+          </tr>
+          <tr>
+            <td>users ↔ cohorts</td>
+            <td>N:M</td>
+            <td>user_cohorts 중간 테이블을 통한 참여 이력</td>
+          </tr>
+          <tr>
+            <td>users → challenges</td>
+            <td>1:N</td>
+            <td>사용자별 챌린지 진행 현황</td>
+          </tr>
+          <tr>
+            <td>users → daily_records</td>
+            <td>1:N</td>
+            <td>사용자별 일일 기록</td>
+          </tr>
+          <tr>
+            <td>users → surveys</td>
+            <td>1:N</td>
+            <td>사용자별 사전/사후 설문</td>
+          </tr>
+          <tr>
+            <td>users → community_posts</td>
+            <td>1:N</td>
+            <td>사용자별 커뮤니티 게시글</td>
+          </tr>
+          <tr>
+            <td>community_posts → community_comments</td>
+            <td>1:N</td>
+            <td>게시글별 댓글</td>
+          </tr>
+          <tr>
+            <td>cohorts → applications</td>
+            <td>1:N</td>
+            <td>기수별 신청서</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ========================================
+         3. 테이블 상세 명세
+    ======================================== -->
+    <div class="section" id="section-3">
+      <h2 class="section-title">3. 테이블 상세 명세</h2>
+
+      <!-- 3.1 users -->
+      <h3 class="subsection-title">3.1 users (사용자 프로필)</h3>
+      <p>Supabase Auth와 연동된 사용자 프로필 정보를 저장합니다.</p>
+      <table>
+        <caption>표 3-1. users 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK, FK</td>
+            <td>Supabase Auth 사용자 ID (auth.users 참조)</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>name</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>사용자 이름</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>email</code> <span class="badge badge-unique">UNIQUE</span></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>UNIQUE</td>
+            <td>이메일 주소</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>current_cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>Y</td>
+            <td>FK</td>
+            <td>현재 참여 중인 기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>is_admin</code></td>
+            <td>BOOLEAN</td>
+            <td>N</td>
+            <td>-</td>
+            <td>관리자 여부 (기본값: false)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>생성 일시</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>updated_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>수정 일시 (트리거 자동 업데이트)</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT:</strong> 사용자는 본인 데이터만 조회 가능 (auth.uid() = id)</li>
+        <li><strong>INSERT:</strong> 사용자는 본인 프로필 생성 가능 (auth.uid() = id)</li>
+        <li><strong>UPDATE:</strong> 사용자는 본인 데이터만 수정 가능 (auth.uid() = id)</li>
+      </ul>
+
+      <!-- 3.2 cohorts -->
+      <h3 class="subsection-title">3.2 cohorts (기수 정보)</h3>
+      <p>챌린지 기수(코호트) 정보를 관리합니다.</p>
+      <table>
+        <caption>표 3-2. cohorts 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>기수 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>name</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>기수명 (예: "2024년 1기")</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>start_date</code></td>
+            <td>DATE</td>
+            <td>N</td>
+            <td>-</td>
+            <td>시작일</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>end_date</code></td>
+            <td>DATE</td>
+            <td>N</td>
+            <td>-</td>
+            <td>종료일</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>description</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>기수 설명</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>status</code></td>
+            <td>cohort_status</td>
+            <td>N</td>
+            <td>-</td>
+            <td>기수 상태 (recruiting/active/completed)</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>record_type</code></td>
+            <td>record_type_enum</td>
+            <td>N</td>
+            <td>-</td>
+            <td>기록 유형 (both/self_care_only/kindness_only)</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>max_participants</code></td>
+            <td>INTEGER</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>최대 참여 인원</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>생성 일시</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td><code>updated_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>수정 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT:</strong> 모든 인증된 사용자가 조회 가능</li>
+        <li><strong>INSERT/UPDATE/DELETE:</strong> 관리자만 가능 (is_admin = true)</li>
+      </ul>
+
+      <!-- 3.3 user_cohorts -->
+      <h3 class="subsection-title">3.3 user_cohorts (사용자-기수 참여)</h3>
+      <p>사용자와 기수 간의 다대다(N:M) 관계를 저장하는 중간 테이블입니다.</p>
+      <table>
+        <caption>표 3-3. user_cohorts 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>레코드 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>사용자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>joined_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>참여 일시</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>completed_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>완료 일시</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>status</code></td>
+            <td>participation_status</td>
+            <td>N</td>
+            <td>-</td>
+            <td>참여 상태 (active/completed/failed)</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">제약조건</h4>
+      <ul class="constraint-list">
+        <li><strong>UNIQUE:</strong> (user_id, cohort_id) - 사용자당 기수별 1개 참여만 허용</li>
+      </ul>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT:</strong> 사용자는 본인의 참여 이력만 조회 (auth.uid() = user_id)</li>
+        <li><strong>INSERT:</strong> 사용자는 본인의 참여만 생성 (auth.uid() = user_id)</li>
+      </ul>
+
+      <!-- 3.4 challenges -->
+      <h3 class="subsection-title">3.4 challenges (챌린지 진행)</h3>
+      <p>사용자별, 기수별 30일 챌린지 진행 상태를 저장합니다.</p>
+      <table>
+        <caption>표 3-4. challenges 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>레코드 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>사용자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>completed_days</code></td>
+            <td>INTEGER[]</td>
+            <td>N</td>
+            <td>-</td>
+            <td>완료된 날짜 배열 (1-30)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>status</code></td>
+            <td>challenge_status</td>
+            <td>N</td>
+            <td>-</td>
+            <td>챌린지 상태 (waiting/approved/active/completed/failed)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>applied_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>신청 일시</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>approved_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>승인 일시</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>started_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>시작 일시 (사전설문 완료 시)</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>completed_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>완료 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">제약조건</h4>
+      <ul class="constraint-list">
+        <li><strong>UNIQUE:</strong> (user_id, cohort_id) - 사용자당 기수별 1개 챌린지만 허용</li>
+      </ul>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT/UPDATE/INSERT:</strong> 사용자는 본인의 챌린지만 접근 (auth.uid() = user_id)</li>
+      </ul>
+
+      <!-- 3.5 daily_records -->
+      <h3 class="subsection-title">3.5 daily_records (일일 기록)</h3>
+      <p>일일 자기돌봄 및 타인친절 행동 기록을 저장합니다. <strong>이미지 첨부 기능 지원 (v1.1 추가)</strong></p>
+      <table>
+        <caption>표 3-5. daily_records 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>레코드 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>사용자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>day</code></td>
+            <td>INTEGER</td>
+            <td>N</td>
+            <td>-</td>
+            <td>챌린지 일차 (1-30, CHECK 제약)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>self_care_actions</code></td>
+            <td>JSONB</td>
+            <td>N</td>
+            <td>-</td>
+            <td>자기돌봄 행동 배열 (기본값: [])</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>kindness_actions</code></td>
+            <td>JSONB</td>
+            <td>N</td>
+            <td>-</td>
+            <td>타인친절 행동 배열 (기본값: [])</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>quote</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>오늘의 명언</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>is_completed</code></td>
+            <td>BOOLEAN</td>
+            <td>N</td>
+            <td>-</td>
+            <td>기록 완료 여부 (기본값: false)</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>image_url</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td><strong>일일 기록 첨부 이미지 URL (Supabase Storage: daily-record-images)</strong></td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>생성 일시</td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td><code>updated_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>수정 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">제약조건</h4>
+      <ul class="constraint-list">
+        <li><strong>UNIQUE:</strong> (user_id, cohort_id, day) - 사용자/기수/일차별 1개 기록만 허용</li>
+        <li><strong>CHECK:</strong> day BETWEEN 1 AND 30</li>
+      </ul>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT/INSERT/UPDATE:</strong> 사용자는 본인의 기록만 접근 (auth.uid() = user_id)</li>
+        <li><strong>SELECT (Admin):</strong> 관리자는 모든 기록 조회 가능 (is_admin = true)</li>
+      </ul>
+
+      <!-- 3.6 surveys -->
+      <h3 class="subsection-title">3.6 surveys (사전/사후 설문)</h3>
+      <p>챌린지 시작 전(사전)과 완료 후(사후) 설문 응답을 저장합니다.</p>
+      <table>
+        <caption>표 3-6. surveys 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>레코드 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>사용자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>survey_type</code></td>
+            <td>survey_type</td>
+            <td>N</td>
+            <td>-</td>
+            <td>설문 유형 (pre/post)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>responses</code></td>
+            <td>JSONB</td>
+            <td>N</td>
+            <td>-</td>
+            <td>설문 응답 데이터 (34문항)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>scores</code></td>
+            <td>JSONB</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>계산된 척도별 점수</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>제출 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">제약조건</h4>
+      <ul class="constraint-list">
+        <li><strong>UNIQUE:</strong> (user_id, cohort_id, survey_type) - 사용자/기수별 사전/사후 각 1회만 허용</li>
+      </ul>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT/INSERT:</strong> 사용자는 본인의 설문만 접근 (auth.uid() = user_id)</li>
+        <li><strong>SELECT (Admin):</strong> 관리자는 모든 설문 조회 가능 (is_admin = true)</li>
+      </ul>
+
+      <!-- 3.7 community_posts -->
+      <h3 class="subsection-title">3.7 community_posts (커뮤니티 게시글)</h3>
+      <p>코호트 기반 커뮤니티 게시글을 저장합니다. <strong>이미지 첨부 기능 지원 (v1.1 추가)</strong></p>
+      <table>
+        <caption>표 3-7. community_posts 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>게시글 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>작성자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>room_id</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>게시판 구분 ID (celebration/gratitude/anxiety/tiredness/anger)</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>content</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>게시글 내용</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>recommended_quote</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>AI 추천 명언</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>likes</code></td>
+            <td>INTEGER</td>
+            <td>N</td>
+            <td>-</td>
+            <td>좋아요 수 (기본값: 0)</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>anonymous_name</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>익명 닉네임 (자동 생성)</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>avatar</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>이모지 아바타 (자동 생성)</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td><code>image_url</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td><strong>게시글 첨부 이미지 URL (Supabase Storage: community-images)</strong></td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>작성 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT:</strong> 사용자는 같은 기수의 게시글만 조회</li>
+        <li><strong>INSERT:</strong> 사용자는 본인 게시글만 작성 (auth.uid() = user_id)</li>
+        <li><strong>UPDATE/DELETE:</strong> 사용자는 본인 게시글만 수정/삭제 (auth.uid() = user_id)</li>
+        <li><strong>SELECT (Admin):</strong> 관리자는 모든 게시글 조회 가능 (is_admin = true)</li>
+      </ul>
+
+      <!-- 3.8 community_comments -->
+      <h3 class="subsection-title">3.8 community_comments (댓글)</h3>
+      <p>커뮤니티 게시글에 대한 댓글을 저장합니다.</p>
+      <table>
+        <caption>표 3-8. community_comments 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>댓글 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>post_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>게시글 ID (community_posts 참조)</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>user_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>FK</td>
+            <td>작성자 ID (users 참조)</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>content</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>댓글 내용</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>likes</code></td>
+            <td>INTEGER</td>
+            <td>N</td>
+            <td>-</td>
+            <td>좋아요 수 (기본값: 0)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>is_system_quote</code></td>
+            <td>BOOLEAN</td>
+            <td>N</td>
+            <td>-</td>
+            <td>AI 추천 명언 여부 (기본값: false)</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>anonymous_name</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>익명 닉네임 (자동 생성)</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>created_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>작성 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>SELECT:</strong> 사용자는 접근 가능한 게시글의 댓글만 조회</li>
+        <li><strong>INSERT:</strong> 사용자는 본인 댓글만 작성 (auth.uid() = user_id)</li>
+        <li><strong>DELETE:</strong> 사용자는 본인 댓글만 삭제 (auth.uid() = user_id)</li>
+        <li><strong>SELECT (Admin):</strong> 관리자는 모든 댓글 조회 가능 (is_admin = true)</li>
+      </ul>
+
+      <!-- 3.9 applications -->
+      <h3 class="subsection-title">3.9 applications (신청서)</h3>
+      <p>챌린지 참가 신청서를 저장합니다. 관리자가 승인하면 6자리 코드가 발급됩니다.</p>
+      <table>
+        <caption>표 3-9. applications 테이블 컬럼 명세</caption>
+        <thead>
+          <tr>
+            <th class="col-no">No</th>
+            <th class="col-name">컬럼명</th>
+            <th class="col-type">데이터 타입</th>
+            <th class="col-null">NULL</th>
+            <th class="col-key">키</th>
+            <th class="col-desc">설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><code>id</code> <span class="badge badge-pk">PK</span></td>
+            <td>UUID</td>
+            <td>N</td>
+            <td>PK</td>
+            <td>신청서 고유 ID</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><code>name</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>신청자 이름</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>email</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>이메일 주소</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>motivation</code></td>
+            <td>TEXT</td>
+            <td>N</td>
+            <td>-</td>
+            <td>참여 동기</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>status</code></td>
+            <td>application_status</td>
+            <td>N</td>
+            <td>-</td>
+            <td>신청 상태 (pending/approved/rejected)</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>code</code></td>
+            <td>TEXT</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>승인 코드 (6자리, 관리자 발급)</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td><code>code_used_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>코드 사용 일시</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td><code>cohort_id</code> <span class="badge badge-fk">FK</span></td>
+            <td>UUID</td>
+            <td>Y</td>
+            <td>FK</td>
+            <td>배정된 기수 ID (cohorts 참조)</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td><code>applied_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>N</td>
+            <td>-</td>
+            <td>신청 일시</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td><code>processed_at</code></td>
+            <td>TIMESTAMPTZ</td>
+            <td>Y</td>
+            <td>-</td>
+            <td>처리 일시</td>
+          </tr>
+        </tbody>
+      </table>
+      <h4 class="subsubsection-title">RLS 정책</h4>
+      <ul class="policy-list">
+        <li><strong>INSERT:</strong> 누구나 신청 가능 (anon, authenticated)</li>
+        <li><strong>SELECT:</strong> 관리자만 전체 조회 (is_admin = true)</li>
+        <li><strong>SELECT (Code Verify):</strong> 승인된 코드 검증은 누구나 가능 (status = 'approved')</li>
+        <li><strong>UPDATE:</strong> 관리자만 상태 변경 (is_admin = true)</li>
+      </ul>
+    </div>
+
+    <!-- ========================================
+         4. 보안 및 데이터 무결성
+    ======================================== -->
+    <div class="section" id="section-4">
+      <h2 class="section-title">4. 보안 및 데이터 무결성</h2>
+
+      <h3 class="subsection-title">4.1 Row Level Security (RLS) 정책 요약</h3>
+      <p>
+        모든 테이블에 RLS(행 단위 보안)가 적용되어 있으며, Supabase Auth의 JWT 토큰을 통해
+        사용자 인증 및 권한을 자동으로 검증합니다. 총 30개의 RLS 정책이 적용되어 있습니다.
+      </p>
+
+      <table>
+        <caption>표 4-1. 테이블별 RLS 정책 매트릭스</caption>
+        <thead>
+          <tr>
+            <th>테이블</th>
+            <th>SELECT</th>
+            <th>INSERT</th>
+            <th>UPDATE</th>
+            <th>DELETE</th>
+            <th>Admin 권한</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>users</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>cohorts</td>
+            <td>전체</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>전체</td>
+          </tr>
+          <tr>
+            <td>user_cohorts</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>challenges</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>daily_records</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>전체 조회</td>
+          </tr>
+          <tr>
+            <td>surveys</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>-</td>
+            <td>전체 조회</td>
+          </tr>
+          <tr>
+            <td>community_posts</td>
+            <td>같은 기수</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>본인</td>
+            <td>전체 조회</td>
+          </tr>
+          <tr>
+            <td>community_comments</td>
+            <td>접근 가능 게시글</td>
+            <td>본인</td>
+            <td>-</td>
+            <td>본인</td>
+            <td>전체 조회</td>
+          </tr>
+          <tr>
+            <td>applications</td>
+            <td>코드 검증(public)</td>
+            <td>누구나</td>
+            <td>-</td>
+            <td>-</td>
+            <td>전체</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">4.2 데이터 무결성 제약조건</h3>
+      <table>
+        <caption>표 4-2. 주요 제약조건</caption>
+        <thead>
+          <tr>
+            <th>테이블</th>
+            <th>제약조건 유형</th>
+            <th>컬럼</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>users</td>
+            <td>UNIQUE</td>
+            <td>email</td>
+            <td>이메일 중복 방지</td>
+          </tr>
+          <tr>
+            <td>user_cohorts</td>
+            <td>UNIQUE</td>
+            <td>(user_id, cohort_id)</td>
+            <td>기수별 1회 참여 보장</td>
+          </tr>
+          <tr>
+            <td>challenges</td>
+            <td>UNIQUE</td>
+            <td>(user_id, cohort_id)</td>
+            <td>기수별 1개 챌린지 보장</td>
+          </tr>
+          <tr>
+            <td>daily_records</td>
+            <td>UNIQUE</td>
+            <td>(user_id, cohort_id, day)</td>
+            <td>일자별 1개 기록 보장</td>
+          </tr>
+          <tr>
+            <td>daily_records</td>
+            <td>CHECK</td>
+            <td>day</td>
+            <td>1 ≤ day ≤ 30</td>
+          </tr>
+          <tr>
+            <td>surveys</td>
+            <td>UNIQUE</td>
+            <td>(user_id, cohort_id, survey_type)</td>
+            <td>사전/사후 각 1회 보장</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">4.3 트리거 및 자동화</h3>
+      <table>
+        <caption>표 4-3. 트리거 함수</caption>
+        <thead>
+          <tr>
+            <th>트리거 함수</th>
+            <th>적용 테이블</th>
+            <th>동작</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>update_updated_at()</td>
+            <td>users, cohorts, daily_records</td>
+            <td>UPDATE 시 updated_at 컬럼을 현재 시간으로 자동 업데이트</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">4.4 RPC 함수 (원격 프로시저)</h3>
+      <table>
+        <caption>표 4-4. RPC 함수</caption>
+        <thead>
+          <tr>
+            <th>함수명</th>
+            <th>파라미터</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>increment_post_likes</td>
+            <td>post_id UUID</td>
+            <td>게시글 좋아요 수를 원자적으로 증가 (동시성 제어)</td>
+          </tr>
+          <tr>
+            <td>increment_comment_likes</td>
+            <td>comment_id UUID</td>
+            <td>댓글 좋아요 수를 원자적으로 증가 (동시성 제어)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ========================================
+         5. 스토리지 인프라
+    ======================================== -->
+    <div class="section" id="section-5">
+      <h2 class="section-title">5. 스토리지 인프라</h2>
+
+      <h3 class="subsection-title">5.1 Supabase Storage 버킷</h3>
+      <p>
+        이미지 업로드 기능을 위해 Supabase Storage를 사용합니다.
+        2025년 11월 30일 v1.1 업데이트에서 추가되었습니다.
+      </p>
+
+      <table>
+        <caption>표 5-1. 스토리지 버킷 명세</caption>
+        <thead>
+          <tr>
+            <th>버킷명</th>
+            <th>용도</th>
+            <th>접근 권한</th>
+            <th>최대 크기</th>
+            <th>허용 형식</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>community-images</td>
+            <td>커뮤니티 게시글 이미지</td>
+            <td>Public Read / Auth Write</td>
+            <td>5 MB</td>
+            <td>jpg, png, webp</td>
+          </tr>
+          <tr>
+            <td>daily-record-images</td>
+            <td>일일 기록 이미지</td>
+            <td>Public Read / Auth Write</td>
+            <td>5 MB</td>
+            <td>jpg, png, webp</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">5.2 스토리지 접근 정책</h3>
+      <table>
+        <caption>표 5-2. 스토리지 정책</caption>
+        <thead>
+          <tr>
+            <th>정책명</th>
+            <th>버킷</th>
+            <th>작업</th>
+            <th>대상</th>
+            <th>조건</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Authenticated users can upload community images</td>
+            <td>community-images</td>
+            <td>INSERT</td>
+            <td>authenticated</td>
+            <td>bucket_id = 'community-images'</td>
+          </tr>
+          <tr>
+            <td>Public can view community images</td>
+            <td>community-images</td>
+            <td>SELECT</td>
+            <td>public</td>
+            <td>bucket_id = 'community-images'</td>
+          </tr>
+          <tr>
+            <td>Users can delete own community images</td>
+            <td>community-images</td>
+            <td>DELETE</td>
+            <td>authenticated</td>
+            <td>auth.uid() = owner</td>
+          </tr>
+          <tr>
+            <td>Authenticated users can upload daily record images</td>
+            <td>daily-record-images</td>
+            <td>INSERT</td>
+            <td>authenticated</td>
+            <td>bucket_id = 'daily-record-images'</td>
+          </tr>
+          <tr>
+            <td>Public can view daily record images</td>
+            <td>daily-record-images</td>
+            <td>SELECT</td>
+            <td>public</td>
+            <td>bucket_id = 'daily-record-images'</td>
+          </tr>
+          <tr>
+            <td>Users can delete own daily record images</td>
+            <td>daily-record-images</td>
+            <td>DELETE</td>
+            <td>authenticated</td>
+            <td>auth.uid() = owner</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">5.3 파일 경로 구조</h3>
+      <pre><code>{bucket_name}/{user_id}/{timestamp}_{filename}
+
+예시:
+- community-images/123e4567-e89b-12d3-a456-426614174000/1701234567890_photo.jpg
+- daily-record-images/987f6543-e21c-34f5-b678-539725285111/1701234567891_record.png</code></pre>
+    </div>
+
+    <!-- ========================================
+         6. 부록
+    ======================================== -->
+    <div class="section" id="section-6">
+      <h2 class="section-title">6. 부록</h2>
+
+      <h3 class="subsection-title">6.1 Enum 타입 정의</h3>
+      <table>
+        <caption>표 6-1. Enum 타입</caption>
+        <thead>
+          <tr>
+            <th>Enum 타입</th>
+            <th>값</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td rowspan="3">cohort_status</td>
+            <td>recruiting</td>
+            <td>모집 중</td>
+          </tr>
+          <tr>
+            <td>active</td>
+            <td>진행 중</td>
+          </tr>
+          <tr>
+            <td>completed</td>
+            <td>완료됨</td>
+          </tr>
+
+          <tr>
+            <td rowspan="3">record_type_enum</td>
+            <td>both</td>
+            <td>자기돌봄 + 타인친절 모두</td>
+          </tr>
+          <tr>
+            <td>self_care_only</td>
+            <td>자기돌봄만</td>
+          </tr>
+          <tr>
+            <td>kindness_only</td>
+            <td>타인친절만</td>
+          </tr>
+
+          <tr>
+            <td rowspan="3">participation_status</td>
+            <td>active</td>
+            <td>참여 중</td>
+          </tr>
+          <tr>
+            <td>completed</td>
+            <td>완료</td>
+          </tr>
+          <tr>
+            <td>failed</td>
+            <td>실패</td>
+          </tr>
+
+          <tr>
+            <td rowspan="5">challenge_status</td>
+            <td>waiting</td>
+            <td>승인 대기</td>
+          </tr>
+          <tr>
+            <td>approved</td>
+            <td>승인됨</td>
+          </tr>
+          <tr>
+            <td>active</td>
+            <td>진행 중</td>
+          </tr>
+          <tr>
+            <td>completed</td>
+            <td>완료</td>
+          </tr>
+          <tr>
+            <td>failed</td>
+            <td>실패</td>
+          </tr>
+
+          <tr>
+            <td rowspan="2">survey_type</td>
+            <td>pre</td>
+            <td>사전 설문</td>
+          </tr>
+          <tr>
+            <td>post</td>
+            <td>사후 설문</td>
+          </tr>
+
+          <tr>
+            <td rowspan="3">application_status</td>
+            <td>pending</td>
+            <td>대기 중</td>
+          </tr>
+          <tr>
+            <td>approved</td>
+            <td>승인됨</td>
+          </tr>
+          <tr>
+            <td>rejected</td>
+            <td>거부됨</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">6.2 마이그레이션 이력</h3>
+      <table>
+        <caption>표 6-2. 데이터베이스 마이그레이션 이력</caption>
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>파일명</th>
+            <th>날짜</th>
+            <th>설명</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>001_initial_schema.sql</td>
+            <td>2025-11-25</td>
+            <td>초기 스키마 생성 (9개 테이블, RLS, 트리거, RPC)</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>002_fix_cohorts_rls.sql</td>
+            <td>2025-11-25</td>
+            <td>cohorts 테이블 RLS 정책 수정</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>003_fix_users_insert_rls.sql</td>
+            <td>2025-11-25</td>
+            <td>users 테이블 INSERT 정책 추가</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>004_add_code_used_at.sql</td>
+            <td>2025-11-26</td>
+            <td>applications 테이블에 code_used_at 컬럼 추가</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>005_add_applications_rls_and_code_used_at.sql</td>
+            <td>2025-11-26</td>
+            <td>applications RLS 정책 강화</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>007_add_admin_role.sql</td>
+            <td>2025-11-27</td>
+            <td>users 테이블에 is_admin 컬럼 추가, 관리자 권한 체계 구축</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>008_fix_surveys_schema.sql</td>
+            <td>2025-11-28</td>
+            <td>surveys 스키마 수정 및 관리자 RLS 추가</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>009_admin_community_rls.sql</td>
+            <td>2025-11-28</td>
+            <td>커뮤니티 테이블 관리자 RLS 추가</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>110</td>
+            <td>110_add_image_to_community_posts.sql</td>
+            <td>2025-11-30</td>
+            <td>community_posts 테이블에 image_url 컬럼 추가</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>111</td>
+            <td>111_create_storage_buckets.sql</td>
+            <td>2025-11-30</td>
+            <td>Supabase Storage 버킷 및 정책 생성</td>
+            <td>적용완료</td>
+          </tr>
+          <tr>
+            <td>112</td>
+            <td>112_add_image_to_daily_records.sql</td>
+            <td>2025-11-30</td>
+            <td>daily_records 테이블에 image_url 컬럼 추가</td>
+            <td>적용완료</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subsection-title">6.3 용어 정의</h3>
+      <table>
+        <caption>표 6-3. 기술 용어 한영 대조표</caption>
+        <thead>
+          <tr>
+            <th>한글</th>
+            <th>영문</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>데이터베이스</td>
+            <td>Database</td>
+            <td>구조화된 데이터의 집합</td>
+          </tr>
+          <tr>
+            <td>행 단위 보안</td>
+            <td>Row Level Security (RLS)</td>
+            <td>PostgreSQL의 행 수준 접근 제어 기능</td>
+          </tr>
+          <tr>
+            <td>기본키</td>
+            <td>Primary Key (PK)</td>
+            <td>테이블의 각 행을 고유하게 식별하는 컬럼</td>
+          </tr>
+          <tr>
+            <td>외래키</td>
+            <td>Foreign Key (FK)</td>
+            <td>다른 테이블을 참조하는 컬럼</td>
+          </tr>
+          <tr>
+            <td>제약조건</td>
+            <td>Constraint</td>
+            <td>데이터 무결성을 보장하는 규칙</td>
+          </tr>
+          <tr>
+            <td>인덱스</td>
+            <td>Index</td>
+            <td>검색 성능 향상을 위한 데이터 구조</td>
+          </tr>
+          <tr>
+            <td>트리거</td>
+            <td>Trigger</td>
+            <td>특정 이벤트 발생 시 자동 실행되는 함수</td>
+          </tr>
+          <tr>
+            <td>원격 프로시저</td>
+            <td>Remote Procedure Call (RPC)</td>
+            <td>클라이언트에서 호출 가능한 서버 함수</td>
+          </tr>
+          <tr>
+            <td>스토리지 버킷</td>
+            <td>Storage Bucket</td>
+            <td>파일 저장 공간의 논리적 컨테이너</td>
+          </tr>
+          <tr>
+            <td>마이그레이션</td>
+            <td>Migration</td>
+            <td>데이터베이스 스키마 변경 이력</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="margin-top: 60pt; padding: 40px; border-top: 2pt solid var(--primary-blue); text-align: center; color: var(--gray-medium);">
+      <p style="font-size: 9pt;">정서샤워 모바일 앱 MVP 개발 용역</p>
+      <p style="font-size: 9pt; margin-top: 5pt;">© 2025 Emotional Shower. Database Schema Documentation v1.1</p>
+      <p style="font-size: 9pt; margin-top: 5pt;">본 문서는 대외비로 분류되며 무단 복제 및 배포를 금합니다.</p>
+    </div>
+
+  </div>
+</body>
+</html>

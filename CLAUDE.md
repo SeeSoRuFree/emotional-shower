@@ -66,6 +66,8 @@ The app uses Zustand for client-side state management, synchronized with Supabas
 
 - **onboardingStore.ts**: Tracks onboarding completion state.
 
+- **emotionStore.ts**: Emotion check-in data for the home screen balloon animation feature.
+
 **Key Pattern**: All stores call `supabase.auth.getUser()` to get current user, then perform authenticated queries with RLS automatically applied.
 
 ### Authentication & Cohort System
@@ -269,10 +271,41 @@ Migrations located in `supabase/migrations/`:
 - `007_add_admin_role.sql`: Adds `is_admin` column to users table with admin-only RLS policies
 - `008_fix_surveys_schema.sql`: Survey schema fixes
 - `009_admin_community_rls.sql`: Admin access to community posts/comments
+- `110_add_image_to_community_posts.sql`: Image attachment support for posts
+- `111_create_storage_buckets.sql`: Supabase Storage buckets for file uploads
+- `112_add_image_to_daily_records.sql`: Image attachment support for daily records
+- `113_add_notifications_log.sql`: Notification tracking with types, channels, and status
+- `114_add_phone_number.sql`: Phone number field to users table
+- `115_add_phone_to_applications.sql`: Phone number field to applications
+- `116_add_kakao_chat_url_to_cohorts.sql`: Kakao chat URL for cohort communication
 
-Apply migrations via Supabase CLI or dashboard.
+Apply migrations via Supabase CLI: `supabase db push`
 
-**Migration History Context**: The codebase recently completed a full migration from localStorage to Supabase (completed Nov 30, 2025). All stores (challengeStore, dailyRecordStore, surveyStore, applicationStore, communityStore) now persist data in Supabase tables with proper RLS policies.
+### Supabase Edge Functions
+
+Edge Functions located in `supabase/functions/`:
+
+- **send-approval-email**: Sends approval email with verification code when admin approves application
+- **send-notification**: Unified notification service supporting email and SMS via NHN Cloud
+- **verify-code**: Validates application approval codes
+
+**Shared utilities** (`supabase/functions/_shared/`):
+- `nhn-cloud.ts`, `nhn-cloud-sms.ts`: NHN Cloud API clients for email/SMS
+- `email-templates.ts`, `sms-templates.ts`: Notification message templates
+- `supabase-client.ts`: Service role client for bypassing RLS
+
+**Notification Types**: `application_approval`, `challenge_start_reminder`, `daily_record_reminder`, `challenge_completion`, `milestone_reached`, `pre_survey_reminder`, `post_survey_reminder`
+
+**Environment Variables** (set in Supabase Dashboard → Edge Functions):
+- `NHN_CLOUD_APP_KEY`, `NHN_CLOUD_SECRET_KEY`: NHN Cloud API credentials
+- `NHN_CLOUD_SENDER_EMAIL`: Verified sender email address
+- `NHN_CLOUD_SMS_SENDER`: Verified SMS sender number
+
+### Supabase Storage
+
+Storage buckets for file uploads:
+- `community-images`: Images attached to community posts
+- `daily-record-images`: Images attached to daily records
 
 ## Admin System
 
