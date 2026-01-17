@@ -45,7 +45,7 @@ export default function Community() {
     loadAllPosts,
     addPost: addPostToStore,
     incrementPostLikes,
-    generateCohortStats,
+    loadCohortStats,
     initialized
   } = useCommunityStore();
 
@@ -70,13 +70,19 @@ export default function Community() {
     loadAllPosts(cohortId);
   }, [cohortId, initialized, loadAllPosts]);
 
-  // Generate cohort statistics
+  // Load cohort statistics from DB
   useEffect(() => {
-    if (!cohortId || !currentCohort || !userChallenge) return;
+    if (!cohortId || !currentCohort) return;
 
-    const cohortStats = generateCohortStats(currentCohort.id, userStamps, currentDay);
-    setStats(cohortStats);
-  }, [cohortId, currentCohort, userChallenge, userStamps, currentDay, generateCohortStats]);
+    const fetchStats = async () => {
+      const cohortStats = await loadCohortStats(currentCohort.id, userStamps);
+      if (cohortStats) {
+        setStats(cohortStats);
+      }
+    };
+
+    fetchStats();
+  }, [cohortId, currentCohort, userStamps, loadCohortStats]);
 
   const handleStartWriting = () => {
     setIsWriting(true);

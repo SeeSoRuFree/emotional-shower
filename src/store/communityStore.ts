@@ -53,12 +53,12 @@ interface CommunityStore {
   addComment: (postId: string, content: string) => Promise<boolean>;
   incrementPostLikes: (postId: string) => Promise<boolean>;
   incrementCommentLikes: (commentId: string) => Promise<boolean>;
+  loadCohortStats: (cohortId: string, userStamps: number) => Promise<CohortStats | null>;
 
   // Utility functions
   formatTimeAgo: (timestamp: number) => string;
   generateAnonymousName: () => string;
   getRandomAvatar: () => string;
-  generateCohortStats: (cohortId: string, userStamps: number, currentDay: number) => CohortStats;
 }
 
 // Utility: Time formatter
@@ -97,54 +97,144 @@ const generateAnonymousName = (): string => {
   return `${adj}${noun}${num}`;
 };
 
-// Utility: Cohort stats generator (virtual data)
-const generateCohortStats = (cohortId: string, userStamps: number, currentDay: number): CohortStats => {
-  const seed = cohortId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const random = (min: number, max: number, offset: number = 0) => {
-    const x = Math.sin(seed + offset) * 10000;
-    return Math.floor(min + (x - Math.floor(x)) * (max - min + 1));
-  };
+// Load cohort stats from Supabase (real data)
+const loadCohortStatsFromDB = async (cohortId: string, userStamps: number): Promise<CohortStats | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
 
-  const totalUsers = random(80, 150, 1);
-  const todayCompleted = random(Math.floor(totalUsers * 0.5), Math.floor(totalUsers * 0.85), 2);
-  const perfectStreakRate = Math.max(0.3, 0.9 - (currentDay * 0.02));
-  const perfectStreakUsers = Math.floor(totalUsers * perfectStreakRate);
-  const averageStamps = random(10, 20, 4) + Math.random();
+    // 1. 기수 참여자 수 조회
+    const { data: userCohortsData, error: userCohortsError } = await supabase
+      .from('user_cohorts')
+      .select('user_id')
+      .eq('cohort_id', cohortId);
 
-  const topUsers = [];
-  const userRank = random(1, 8, 5);
-
-  for (let i = 1; i <= 5; i++) {
-    if (i === userRank && userRank <= 5) {
-      topUsers.push({
-        rank: i,
-        name: '나',
-        stamps: userStamps,
-        avatar: '⭐'
-      });
-    } else {
-      topUsers.push({
-        rank: i,
-        name: generateAnonymousName(),
-        stamps: random(userStamps - 3, userStamps + 5, i + 10),
-        avatar: getRandomAvatar()
-      });
+    if (userCohortsError) {
+      console.error('Failed to load user_cohorts:', userCohortsError);
+      return null;
     }
+
+    const totalUsers = userCohortsData?.length || 0;
+    if (totalUsers === 0) {
+      return {
+        totalUsers: 0,
+        todayCompleted: 0,
+        todayCompletionRate: 0,
+        perfectStreakUsers: 0,
+        averageStamps: 0,
+        topUsers: []
+      };
+    }
+
+    // 2. 모든 챌린지 데이터 조회 (해당 기수)
+    const { data: challengesData, error: challengesError } = await supabase
+      .from('challenges')
+      .select('user_id, completed_days, status')
+      .eq('cohort_id', cohortId)
+      .in('status', ['active', 'completed']);
+
+    if (challengesError) {
+      console.error('Failed to load challenges:', challengesError);
+      return null;
+    }
+
+    // 3. 오늘 기록 완료한 사용자 수 (daily_records에서 오늘 날짜 기록 조회)
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+    const { data: todayRecordsData, error: todayRecordsError } = await supabase
+      .from('daily_records')
+      .select('user_id')
+      .eq('cohort_id', cohortId)
+      .eq('is_completed', true)
+      .gte('created_at', todayStart)
+      .lt('created_at', todayEnd);
+
+    if (todayRecordsError) {
+      console.error('Failed to load today records:', todayRecordsError);
+    }
+
+    // 중복 제거한 오늘 완료 사용자 수
+    const todayCompletedUserIds = new Set(todayRecordsData?.map(r => r.user_id) || []);
+    const todayCompleted = todayCompletedUserIds.size;
+
+    // 4. 스탬프 통계 계산
+    const challenges = challengesData || [];
+    let totalStamps = 0;
+    let perfectStreakUsers = 0;
+
+    // 사용자별 스탬프 정보 (TOP 5용)
+    const userStampsMap: Array<{ userId: string; stamps: number }> = [];
+
+    challenges.forEach(challenge => {
+      const stamps = challenge.completed_days?.length || 0;
+      totalStamps += stamps;
+      userStampsMap.push({ userId: challenge.user_id, stamps });
+
+      // 연속 기록자 (현재 진행 일수와 완료 일수가 같은 사용자)
+      // completed_days 배열이 1부터 연속된 숫자인지 체크
+      const completedDays = challenge.completed_days || [];
+      if (completedDays.length > 0) {
+        const sortedDays = [...completedDays].sort((a, b) => a - b);
+        const expectedDays = sortedDays.length;
+        const isConsecutive = sortedDays.every((day, idx) => day === idx + 1);
+        if (isConsecutive && expectedDays === sortedDays[sortedDays.length - 1]) {
+          perfectStreakUsers++;
+        }
+      }
+    });
+
+    const averageStamps = challenges.length > 0 ? totalStamps / challenges.length : 0;
+
+    // 5. TOP 5 사용자 조회 (이름 포함)
+    userStampsMap.sort((a, b) => b.stamps - a.stamps);
+    const top5UserIds = userStampsMap.slice(0, 5).map(u => u.userId);
+
+    // 사용자 이름 조회
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', top5UserIds);
+
+    const userNameMap = new Map(usersData?.map(u => [u.id, u.name]) || []);
+
+    const topUsers = userStampsMap.slice(0, 5).map((u, index) => {
+      const isCurrentUser = u.userId === user.id;
+      return {
+        rank: index + 1,
+        name: isCurrentUser ? '나' : (userNameMap.get(u.userId) || '익명'),
+        stamps: u.stamps,
+        avatar: isCurrentUser ? '⭐' : getRandomAvatar()
+      };
+    });
+
+    // 현재 사용자가 TOP 5에 없으면 추가
+    const currentUserInTop = topUsers.find(u => u.name === '나');
+    if (!currentUserInTop && userStamps > 0) {
+      const currentUserRank = userStampsMap.findIndex(u => u.userId === user.id) + 1;
+      if (currentUserRank > 5) {
+        topUsers.push({
+          rank: currentUserRank,
+          name: '나',
+          stamps: userStamps,
+          avatar: '⭐'
+        });
+      }
+    }
+
+    return {
+      totalUsers,
+      todayCompleted,
+      todayCompletionRate: totalUsers > 0 ? Math.round((todayCompleted / totalUsers) * 100) : 0,
+      perfectStreakUsers,
+      averageStamps: Math.round(averageStamps * 10) / 10,
+      topUsers
+    };
+  } catch (error) {
+    console.error('Load cohort stats error:', error);
+    return null;
   }
-
-  topUsers.sort((a, b) => b.stamps - a.stamps);
-  topUsers.forEach((user, index) => {
-    user.rank = index + 1;
-  });
-
-  return {
-    totalUsers,
-    todayCompleted,
-    todayCompletionRate: Math.round((todayCompleted / totalUsers) * 100),
-    perfectStreakUsers,
-    averageStamps: Math.round(averageStamps * 10) / 10,
-    topUsers
-  };
 };
 
 export const useCommunityStore = create<CommunityStore>((set, get) => ({
@@ -494,9 +584,11 @@ export const useCommunityStore = create<CommunityStore>((set, get) => ({
     }
   },
 
+  // Load cohort stats from DB
+  loadCohortStats: loadCohortStatsFromDB,
+
   // Utility functions (exposed for components)
   formatTimeAgo,
   generateAnonymousName,
-  getRandomAvatar,
-  generateCohortStats
+  getRandomAvatar
 }));
